@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
-#if VSF_USE_LINUX_LIBUSB == ENABLED
+#if VSF_LINUX_USE_LIBUSB == ENABLED
 #include <libusb.h>
 
 int lsusb_main(int argc, char *argv[])
@@ -17,10 +17,12 @@ int lsusb_main(int argc, char *argv[])
     ssize_t cnt = libusb_get_device_list(NULL, &devs);
     if (cnt < 0) {
         printf("fail to get device list\r\n");
+        libusb_exit(NULL);
         return -1;
     }
     if (!cnt) {
         printf("no usb device connected\r\n");
+        libusb_exit(NULL);
         return -1;
     }
 

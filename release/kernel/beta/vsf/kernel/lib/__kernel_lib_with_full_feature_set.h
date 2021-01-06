@@ -24,7 +24,7 @@
 /*============================ MACROS ========================================*/
 #define VSF_USE_KERNEL                                          ENABLED
 
-#define     VSF_KERNEL_CFG_SUPPORT_PREMPT                       ENABLED
+#define     VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED                       ENABLED
 #define         VSF_KERNEL_CFG_SUPPORT_DYNAMIC_PRIOTIRY         ENABLED
 #define         VSF_KERNEL_CFG_SUPPORT_EVT_MESSAGE              ENABLED
 
@@ -46,6 +46,8 @@
 #define     VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL                 ENABLED
 #define         VSF_KERNEL_CFG_EDA_SUPPORT_FSM                  ENABLED
 #define         __VSF_KERNEL_CFG_EDA_FRAME_POOL                 ENABLED
+#define         VSF_KERNEL_CFG_EDA_FAST_SUB_CALL                DISABLED
+#define         VSF_KERNEL_CFG_FRAME_USER_BITS                  6
 
 #define     VSF_KERNEL_CFG_EDA_SUPPORT_ON_TERMINATE             ENABLED
 
@@ -54,6 +56,8 @@
 #define         VSF_KERNEL_CFG_THREAD_STACK_GUARDIAN_SIZE       0
 #define     VSF_KERNEL_CFG_EDA_SUPPORT_PT                       ENABLED
 #define     VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM               ENABLED
+
+
 
 /*============================ TYPES =========================================*/
 /*============================ GLOBAL VARIABLES ==============================*/

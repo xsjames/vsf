@@ -21,21 +21,62 @@
 
 #if VSF_USE_LINUX == ENABLED
 
-#define VSFSTREAM_CLASS_INHERIT
-#define VSF_FS_INHERIT
-#define VSF_LINUX_IMPLEMENT
-#include "./vsf_linux.h"
+#define __VSF_EDA_CLASS_INHERIT__
+#define __VSF_SIMPLE_STREAM_CLASS_INHERIT__
+#define __VSF_FS_CLASS_INHERIT__
+#define __VSF_LINUX_CLASS_IMPLEMENT
 
-#include <unistd.h>
-#include <semaphore.h>
-#include <signal.h>
-#include <poll.h>
-#include <sys/stat.h>
-#include <sys/select.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <errno.h>
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED
+#   include "./include/unistd.h"
+#   include "./include/semaphore.h"
+#   include "./include/signal.h"
+#   include "./include/poll.h"
+#   include "./include/sys/stat.h"
+#   include "./include/sys/select.h"
+#   include "./include/sys/wait.h"
+#   include "./include/sys/mount.h"
+#   include "./include/fcntl.h"
+#   include "./include/errno.h"
+#   include "./include/termios.h"
+#else
+#   include <unistd.h>
+#   include <semaphore.h>
+#   include <signal.h>
+#   include <poll.h>
+#   include <sys/stat.h>
+#   include <sys/select.h>
+#   include <sys/wait.h>
+#   include <sys/mount.h>
+#   include <fcntl.h>
+#   include <errno.h>
+#   include <termios.h>
+#endif
 #include <stdarg.h>
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED && VSF_LINUX_USE_SIMPLE_STDLIB == ENABLED
+#   include "./include/simple_libc/stdlib.h"
+#else
+#   include <stdlib.h>
+#endif
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED && VSF_LINUX_USE_SIMPLE_STRING == ENABLED
+#   include "./include/simple_libc/string.h"
+#else
+#   include <string.h>
+#endif
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED && VSF_LINUX_USE_SIMPLE_STDIO == ENABLED
+#   include "./include/simple_libc/stdio.h"
+#else
+#   include <stdio.h>
+#endif
+
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_suppress=pe111
+#endif
+
+#if __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-align"
+#endif
 
 /*============================ MACROS ========================================*/
 
@@ -43,18 +84,22 @@
 #   error VSF_KERNEL_CFG_EDA_SUPPORT_ON_TERMINATE MUST be enbled
 #endif
 
-#ifndef VSF_LINUX_CFG_STACKSIZE
-#   define VSF_LINUX_CFG_STACKSIZE          1024
+#if VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL != ENABLED
+#   error VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL MUST be enabled
+#endif
+
+#ifndef VSF_LINUX_CFG_PRIO_LOWEST
+#   define VSF_LINUX_CFG_PRIO_LOWEST        vsf_prio_0
 #endif
 
 #ifndef VSF_LINUX_CFG_PRIO_HIGHEST
-#   define VSF_LINUX_CFG_PRIO_HIGHEST       vsf_prio_1
+#   define VSF_LINUX_CFG_PRIO_HIGHEST       vsf_prio_0
 #endif
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct vsf_linux_t {
+typedef struct vsf_linux_t {
     int cur_tid;
     int cur_pid;
     vsf_dlist_t process_list;
@@ -63,27 +108,15 @@ struct vsf_linux_t {
     int sig_pid;
 
     vsf_linux_stdio_stream_t stdio_stream;
-};
-typedef struct vsf_linux_t vsf_linux_t;
+} vsf_linux_t;
 
-struct vsf_linux_main_priv_t {
+typedef struct vsf_linux_main_priv_t {
     vsf_linux_process_ctx_t *ctx;
-};
-typedef struct vsf_linux_main_priv_t vsf_linux_main_priv_t;
+} vsf_linux_main_priv_t;
 
-struct vsf_linux_fs_priv_t {
-    vk_file_t *file;
-    uint64_t pos;
-
-    struct dirent dir;
-    vk_file_t *child;
-};
-typedef struct vsf_linux_fs_priv_t vsf_linux_fs_priv_t;
-
-struct vsf_linux_stream_priv_t {
+typedef struct vsf_linux_stream_priv_t {
     vsf_stream_t *stream;
-};
-typedef struct vsf_linux_stream_priv_t vsf_linux_stream_priv_t;
+} vsf_linux_stream_priv_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
@@ -91,10 +124,7 @@ int errno;
 
 /*============================ PROTOTYPES ====================================*/
 
-#if     defined(WEAK_VSF_LINUX_CREATE_FHS_EXTERN)                               \
-    &&  defined(WEAK_VSF_LINUX_CREATE_FHS)
-WEAK_VSF_LINUX_CREATE_FHS_EXTERN
-#endif
+extern int vsf_linux_create_fhs(void);
 
 extern void vsf_linux_glibc_init(void);
 
@@ -110,7 +140,7 @@ static ssize_t __vsf_linux_stream_read(vsf_linux_fd_t *sfd, void *buf, size_t co
 static ssize_t __vsf_linux_stream_write(vsf_linux_fd_t *sfd, void *buf, size_t count);
 static int __vsf_linux_stream_close(vsf_linux_fd_t *sfd);
 
-static vsf_linux_process_t * vsf_linux_start_process_internal(int stack_size,
+static vsf_linux_process_t * __vsf_linux_start_process_internal(int stack_size,
         vsf_linux_main_entry_t entry, vsf_prio_t prio);
 
 /*============================ LOCAL VARIABLES ===============================*/
@@ -123,20 +153,20 @@ static const vsf_linux_thread_op_t __vsf_linux_main_op = {
     .on_terminate       = vsf_linux_thread_on_terminate,
 };
 
-static const vsf_linux_fd_op_t __vsf_linux_fs_fdop = {
+const vsf_linux_fd_op_t __vsf_linux_fs_fdop = {
     .priv_size          = sizeof(vsf_linux_fs_priv_t),
-    .fcntl              = __vsf_linux_fs_fcntl,
-    .read               = __vsf_linux_fs_read,
-    .write              = __vsf_linux_fs_write,
-    .close              = __vsf_linux_fs_close,
+    .fn_fcntl           = __vsf_linux_fs_fcntl,
+    .fn_read            = __vsf_linux_fs_read,
+    .fn_write           = __vsf_linux_fs_write,
+    .fn_close           = __vsf_linux_fs_close,
 };
 
 static const vsf_linux_fd_op_t __vsf_linux_stream_fdop = {
     .priv_size          = sizeof(vsf_linux_stream_priv_t),
-    .fcntl              = __vsf_linux_stream_fcntl,
-    .read               = __vsf_linux_stream_read,
-    .write              = __vsf_linux_stream_write,
-    .close              = __vsf_linux_stream_close,
+    .fn_fcntl           = __vsf_linux_stream_fcntl,
+    .fn_read            = __vsf_linux_stream_read,
+    .fn_write           = __vsf_linux_stream_write,
+    .fn_close           = __vsf_linux_stream_close,
 };
 
 /*============================ IMPLEMENTATION ================================*/
@@ -151,29 +181,28 @@ int vsf_linux_create_fhs(void)
 
 static int __vsf_linux_init_thread(int argc, char *argv[])
 {
+    int err = vsf_linux_create_fhs();
+    if (err) { return err; }
     return execl("/sbin/init", "init", NULL);
 }
 
 static int __vsf_linux_kernel_thread(int argc, char *argv[])
 {
-    int err;
-
     __vsf_linux.kernel_process = vsf_linux_get_cur_process();
-#ifndef WEAK_VSF_LINUX_CREATE_FHS
-    err = vsf_linux_create_fhs();
-#else
-    err = WEAK_VSF_LINUX_CREATE_FHS();
-#endif
-    if (err) { return err; }
 
+#if VSF_LINUX_CFG_SUPPORT_SIG != ENABLED
+    __vsf_linux_init_thread(argc, argv);
+#else
     // create init process(pid1)
-    vsf_linux_start_process_internal(0, __vsf_linux_init_thread, VSF_LINUX_CFG_PRIO_HIGHEST);
+    __vsf_linux_start_process_internal(0, __vsf_linux_init_thread, VSF_LINUX_CFG_PRIO_HIGHEST);
 
     vsf_linux_sig_handler_t *handler;
     vsf_linux_process_t *process;
     vsf_evt_t evt;
     unsigned long sig_mask;
     int sig;
+    bool found_handler;
+
     while (1) {
         evt = vsf_thread_wait();
         VSF_LINUX_ASSERT(VSF_EVT_MESSAGE == evt);
@@ -184,27 +213,33 @@ static int __vsf_linux_kernel_thread(int argc, char *argv[])
             sig = ffz(~sig_mask);
             sig_mask &= ~(1 << sig);
 
-            handler = NULL;
+            found_handler = false;
             __vsf_dlist_foreach_unsafe(vsf_linux_sig_handler_t, node, &process->sig.handler_list) {
                 if (_->sig == sig) {
                     handler = _;
+                    found_handler = true;
                     break;
                 }
             }
 
             __vsf_linux.sig_pid = process->id.pid;
-            if (handler != NULL) {
-                siginfo_t siginfo = {
-                    .si_signo   = sig,
-                    .si_errno   = errno,
-                };
-                handler->handler(sig, &siginfo, NULL);
+            if (found_handler && (handler != SIG_DFL)) {
+                if (handler != (vsf_linux_sig_handler_t *)SIG_IGN) {
+                    siginfo_t siginfo = {
+                        .si_signo   = sig,
+                        .si_errno   = errno,
+                    };
+                    handler->handler(sig, &siginfo, NULL);
+                }
             } else if (!((1 << sig) & ((1 << SIGURG) | (1 << SIGCONT) | (1 << SIGWINCH)))) {
                 // TODO: terminate other thread is not supported in VSF, so just ignore
 //                VSF_LINUX_ASSERT(false);
             }
         }
     }
+#endif
+    // actually will not return, just make compiler happy
+    return 0;
 }
 
 vsf_err_t vsf_linux_init(vsf_linux_stdio_stream_t *stdio_stream)
@@ -212,10 +247,11 @@ vsf_err_t vsf_linux_init(vsf_linux_stdio_stream_t *stdio_stream)
     VSF_LINUX_ASSERT(stdio_stream != NULL);
     memset(&__vsf_linux, 0, sizeof(__vsf_linux));
     __vsf_linux.stdio_stream = *stdio_stream;
+    vk_fs_init();
     vsf_linux_glibc_init();
 
     // create kernel process(pid0)
-    if (NULL != vsf_linux_start_process_internal(0, __vsf_linux_kernel_thread, vsf_prio_0)) {
+    if (NULL != __vsf_linux_start_process_internal(0, __vsf_linux_kernel_thread, VSF_LINUX_CFG_PRIO_LOWEST)) {
         return VSF_ERR_NONE;
     }
     return VSF_ERR_FAIL;
@@ -231,10 +267,19 @@ vsf_linux_thread_t * vsf_linux_create_thread(vsf_linux_process_t *process, int s
     if (!stack_size) {
         stack_size = VSF_LINUX_CFG_STACKSIZE;
     }
+    stack_size += (1 << VSF_KERNEL_CFG_THREAD_STACK_ALIGN_BIT) - 1;
+    stack_size &= ~((1 << VSF_KERNEL_CFG_THREAD_STACK_ALIGN_BIT) - 1);
 
-    int size = (op->priv_size + sizeof(*thread) + 3) & ~3;
-    thread = calloc(1, size + stack_size);
+    uint_fast32_t thread_size = op->priv_size + sizeof(*thread);
+    thread_size += (1 << VSF_KERNEL_CFG_THREAD_STACK_ALIGN_BIT) - 1;
+    thread_size &= ~((1 << VSF_KERNEL_CFG_THREAD_STACK_ALIGN_BIT) - 1);
+
+    uint_fast32_t all_size = thread_size + stack_size;
+    all_size += (1 << VSF_KERNEL_CFG_THREAD_STACK_ALIGN_BIT) - 1;
+
+    thread = (vsf_linux_thread_t *)vsf_heap_malloc_aligned(all_size, 1 << VSF_KERNEL_CFG_THREAD_STACK_ALIGN_BIT);
     if (thread != NULL) {
+        memset(thread, 0, thread_size);
         thread->process = process;
 
         // set entry and on_terminate
@@ -243,7 +288,7 @@ vsf_linux_thread_t * vsf_linux_create_thread(vsf_linux_process_t *process, int s
 
         // set stack
         thread->stack_size = stack_size;
-        thread->stack = (void *)((uintptr_t)thread + size);
+        thread->stack = (void *)((uintptr_t)thread + thread_size);
 
         vsf_protect_t orig = vsf_protect_sched();
             thread->tid = __vsf_linux.cur_tid++;
@@ -255,9 +300,8 @@ vsf_linux_thread_t * vsf_linux_create_thread(vsf_linux_process_t *process, int s
 
 int vsf_linux_start_thread(vsf_linux_thread_t *thread)
 {
-    vsf_thread_start(   &thread->use_as__vsf_thread_t,
-                        &thread->use_as__vsf_thread_cb_t,
-                        thread->process->prio);
+    vsf_thread_start(&thread->use_as__vsf_thread_t,
+        &thread->use_as__vsf_thread_cb_t, thread->process->prio);
     return 0;
 }
 
@@ -265,7 +309,7 @@ vsf_linux_process_t * vsf_linux_create_process(int stack_size)
 {
     vsf_linux_process_t *process = calloc(1, sizeof(vsf_linux_process_t));
     if (process != NULL) {
-        process->prio = vsf_prio_0;
+        process->prio = vsf_prio_inherit;
         process->stdio_stream = __vsf_linux.stdio_stream;
 
         vsf_linux_thread_t *thread = vsf_linux_create_thread(process, stack_size, &__vsf_linux_main_op);
@@ -274,7 +318,7 @@ vsf_linux_process_t * vsf_linux_create_process(int stack_size)
             return NULL;
         }
 
-        vsf_linux_main_priv_t *priv = (vsf_linux_main_priv_t *)&thread[1];
+        vsf_linux_main_priv_t *priv = vsf_linux_thread_get_priv(thread);
         priv->ctx = &process->ctx;
 
         vsf_protect_t orig = vsf_protect_sched();
@@ -296,10 +340,10 @@ int vsf_linux_start_process(vsf_linux_process_t *process)
     return vsf_linux_start_thread(thread);
 }
 
-static vsf_linux_process_t * vsf_linux_start_process_internal(int stack_size,
+static vsf_linux_process_t * __vsf_linux_start_process_internal(int stack_size,
         vsf_linux_main_entry_t entry, vsf_prio_t prio)
 {
-    VSF_LINUX_ASSERT(prio <= VSF_LINUX_CFG_PRIO_HIGHEST);
+    VSF_LINUX_ASSERT((prio >= VSF_LINUX_CFG_PRIO_LOWEST) && (prio <= VSF_LINUX_CFG_PRIO_HIGHEST));
     vsf_linux_process_t *process = vsf_linux_create_process(stack_size);
     if (process != NULL) {
         process->prio = prio;
@@ -353,7 +397,7 @@ static void __vsf_linux_main_on_run(vsf_thread_cb_t *cb)
 {
     vsf_linux_thread_t *thread = container_of(cb, vsf_linux_thread_t, use_as__vsf_thread_cb_t);
     vsf_linux_process_t *process = thread->process;
-    vsf_linux_main_priv_t *priv = (vsf_linux_main_priv_t *)&thread[1];
+    vsf_linux_main_priv_t *priv = vsf_linux_thread_get_priv(thread);
     vsf_linux_process_ctx_t *ctx = priv->ctx;
 
     vsf_linux_fd_t *sfd;
@@ -379,7 +423,7 @@ static void __vsf_linux_main_on_run(vsf_thread_cb_t *cb)
 
     // clean up
     do {
-        vsf_dlist_remove_head(vsf_linux_fd_t, fd_node, &process->fd_list, sfd);
+        vsf_dlist_peek_head(vsf_linux_fd_t, fd_node, &process->fd_list, sfd);
         if (sfd != NULL) {
             close(sfd->fd);
         }
@@ -399,7 +443,7 @@ void vsf_linux_thread_on_terminate(vsf_linux_thread_t *thread)
     vsf_protect_t orig = vsf_protect_sched();
         vsf_dlist_remove(vsf_linux_thread_t, thread_node, &process->thread_list, thread);
     vsf_unprotect_sched(orig);
-    free(thread);
+    vsf_heap_free(thread);
 
     if (thread == thread_main) {
         vsf_protect_t orig = vsf_protect_sched();
@@ -413,7 +457,11 @@ void vsf_linux_thread_on_terminate(vsf_linux_thread_t *thread)
     }
 }
 
-int execv(const char *pathname, char *const argv[])
+#if defined(__WIN__) && defined(__CPU_X64__)
+intptr_t execv(const char *pathname, char const* const* argv)
+#else
+int execv(const char *pathname, char const* const* argv)
+#endif
 {
     // fd will be closed after entry return
     vsf_linux_main_entry_t entry;
@@ -438,7 +486,11 @@ int execv(const char *pathname, char *const argv[])
     return 0;
 }
 
+#if defined(__WIN__) && defined(__CPU_X64__)
+intptr_t execl(const char *pathname, const char *arg, ...)
+#else
 int execl(const char *pathname, const char *arg, ...)
+#endif
 {
     // fd will be closed after entry return
     vsf_linux_main_entry_t entry;
@@ -478,6 +530,7 @@ int system(const char * cmd)
 
 int kill(pid_t pid, int sig)
 {
+#if VSF_LINUX_CFG_SUPPORT_SIG == ENABLED
     vsf_linux_process_t *process = vsf_linux_get_process(pid);
     if (process != NULL) {
         if (!process->id.pid) {
@@ -493,7 +546,9 @@ int kill(pid_t pid, int sig)
         // TODO: avoid posting event/message to thread,
         //  if the thread is not waiting for the dedicated event/message
         vsf_eda_post_msg(&thread->use_as__vsf_eda_t, process);
+        return 0;
     }
+#endif
     return -1;
 }
 
@@ -546,20 +601,23 @@ static ssize_t __vsf_linux_fs_read(vsf_linux_fd_t *sfd, void *buf, size_t count)
 {
     vsf_linux_fs_priv_t *priv = (vsf_linux_fs_priv_t *)sfd->priv;
     vk_file_t *file = priv->file;
-    int32_t rsize;
     ssize_t result = 0;
+    int32_t rsize;
 
-    do {
-        vk_file_read(file, priv->pos, count, (uint8_t *)buf, &rsize);
-        if (VSF_ERR_NONE != vk_file_get_errcode(file)) {
+    while (count > 0) {
+        vk_file_read(file, priv->pos, count, (uint8_t *)buf);
+        rsize = (int32_t)vsf_eda_get_return_value();
+        if (rsize < 0) {
             return -1;
+        } else if (!rsize) {
+            break;
         }
 
         count -= rsize;
         result += rsize;
         priv->pos += rsize;
         buf = (uint8_t *)buf + rsize;
-    } while ((count > 0) && (rsize > 0));
+    }
     return result;
 }
 
@@ -567,20 +625,23 @@ static ssize_t __vsf_linux_fs_write(vsf_linux_fd_t *sfd, void *buf, size_t count
 {
     vsf_linux_fs_priv_t *priv = (vsf_linux_fs_priv_t *)sfd->priv;
     vk_file_t *file = priv->file;
-    int32_t wsize;
     ssize_t result = 0;
+    int32_t wsize;
 
-    do {
-        vk_file_write(file, priv->pos, count, (uint8_t *)buf, &wsize);
-        if (VSF_ERR_NONE != vk_file_get_errcode(file)) {
+    while (count > 0) {
+        vk_file_write(file, priv->pos, count, (uint8_t *)buf);
+        wsize = (int32_t)vsf_eda_get_return_value();
+        if (wsize < 0) {
             return -1;
+        } else if (!wsize) {
+            break;
         }
 
         count -= wsize;
         result += wsize;
         priv->pos += wsize;
         buf = (uint8_t *)buf + wsize;
-    } while (count > 0);
+    }
     return result;
 }
 
@@ -793,9 +854,17 @@ int vsf_linux_fd_rx_trigger(int fd)
 }
 
 #ifndef __WIN__
-// conflict with select in winsock.h
+// conflicts with select in winsock.h
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *execeptfds, struct timeval *timeout)
 {
+    VSF_LINUX_ASSERT(false);
+    return -1;
+}
+
+// conflicts with remove in ucrt
+int remove(const char * pathname)
+{
+    // TODO: remove file by unlink, remove directory by rmdir
     VSF_LINUX_ASSERT(false);
     return -1;
 }
@@ -898,22 +967,25 @@ int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 static int __vsf_linux_fs_create(const char* pathname, mode_t mode, vk_file_attr_t attr, uint_fast64_t size)
 {
     int err = 0;
-    char *path = strdup(pathname);
+    char *path = strdup(pathname), *name = NULL, *name_tmp;
     if (!path) {
         errno = ENOENT;
         return -1;
     }
 
-    char *name = vk_file_getfilename((char *)pathname);
-    path[name - pathname] = '\0';
+    name_tmp = vk_file_getfilename((char *)pathname);
+    path[name_tmp - pathname] = '\0';
     vk_file_t *dir = __vsf_linux_fs_get_file(path);
     if (!dir) {
         err = -1;
         goto do_return;
     }
 
+    // TODO: name is allocated, so if created file is removed
+    //  how to free name?
+    name = strdup(name_tmp);
     vk_file_create(dir, name, attr, size);
-    if (VSF_ERR_NONE != vk_file_get_errcode(dir)) {
+    if (VSF_ERR_NONE != (vsf_err_t)vsf_eda_get_return_value()) {
         err = -1;
     }
     __vsf_linux_fs_close_do(dir);
@@ -922,6 +994,9 @@ static int __vsf_linux_fs_create(const char* pathname, mode_t mode, vk_file_attr
     }
 
 do_return:
+    if ((err < 0) && (name != NULL)) {
+        free(name);
+    }
     free(path);
     return err;
 }
@@ -980,7 +1055,7 @@ int close(int fd)
     vsf_linux_fd_t *sfd = vsf_linux_get_fd(fd);
     if (!sfd) { return -1; }
 
-    int err = sfd->op->close(sfd);
+    int err = sfd->op->fn_close(sfd);
     vsf_linux_delete_fd(fd);
     return err;
 }
@@ -995,21 +1070,43 @@ int fcntl(int fd, int cmd, ...)
     va_start(ap, cmd);
         arg = va_arg(ap, long);
     va_end(ap);
-    return sfd->op->fcntl(sfd, cmd, arg);
+    return sfd->op->fn_fcntl(sfd, cmd, arg);
 }
 
 ssize_t read(int fd, void *buf, size_t count)
 {
     vsf_linux_fd_t *sfd = vsf_linux_get_fd(fd);
     if (!sfd || (sfd->flags & O_WRONLY)) { return -1; }
-    return sfd->op->read(sfd, buf, count);
+    return sfd->op->fn_read(sfd, buf, count);
 }
 
 ssize_t write(int fd, void *buf, size_t count)
 {
     vsf_linux_fd_t *sfd = vsf_linux_get_fd(fd);
     if (!sfd || (sfd->flags & O_RDONLY)) { return -1; }
-    return sfd->op->write(sfd, buf, count);
+    return sfd->op->fn_write(sfd, buf, count);
+}
+
+off_t lseek(int fd, off_t offset, int whence)
+{
+    vsf_linux_fd_t *sfd = vsf_linux_get_fd(fd);
+    VSF_LINUX_ASSERT(sfd->op == &__vsf_linux_fs_fdop);
+    vsf_linux_fs_priv_t *priv = (vsf_linux_fs_priv_t *)sfd->priv;
+    uint_fast64_t new_pos;
+
+    switch (whence) {
+    case SEEK_SET:  new_pos = 0;                break;
+    case SEEK_CUR:  new_pos = priv->pos;        break;
+    case SEEK_END:  new_pos = priv->file->size; break;
+    default:        return -1;
+    }
+
+    new_pos += offset;
+    if (new_pos > priv->file->size) {
+        return -1;
+    }
+    priv->pos = new_pos;
+    return 0;
 }
 
 int stat(const char *pathname, struct stat *buf)
@@ -1041,7 +1138,7 @@ int unlink(const char *pathname)
 
     vk_file_unlink(dir, pathname);
 
-    vsf_err_t err = vk_file_get_errcode(dir);
+    vsf_err_t err = (vsf_err_t)vsf_eda_get_return_value();
     __vsf_linux_fs_close_do(dir);
     return VSF_ERR_NONE == err ? 0 : -1;
 }
@@ -1079,7 +1176,7 @@ struct dirent * readdir(DIR *dir)
 
     child = priv->child;
     priv->dir.d_name = child->name;
-    priv->dir.d_reclen = strlen(child->name);
+    priv->dir.d_reclen = vk_file_get_name_length(child);
     priv->dir.d_type = child->attr & VSF_FILE_ATTR_DIRECTORY ? DT_DIR :
                 child->attr & VSF_FILE_ATTR_EXECUTE ? DT_EXE : DT_REG;
     return &priv->dir;
@@ -1097,7 +1194,7 @@ int closedir(DIR *dir)
 }
 
 int mount(const char *source, const char *target,
-   const vk_fs_op_t *filesystem, unsigned long mountflags, const void *data)
+    const vk_fs_op_t *filesystem, unsigned long mountflags, const void *data)
 {
     int fd = open(target, 0);
     if (fd < 0) { return fd; }
@@ -1105,9 +1202,25 @@ int mount(const char *source, const char *target,
     vsf_linux_fd_t *sfd = vsf_linux_get_fd(fd);
     vsf_linux_fs_priv_t *priv = (vsf_linux_fs_priv_t *)sfd->priv;
     vk_file_t *dir = priv->file;
-    vk_fs_mount(dir, filesystem, (void *)data);
+    vsf_err_t err;
+
+    if (filesystem != NULL) {
+        vk_fs_mount(dir, filesystem, (void *)data);
+        err = (vsf_err_t)vsf_eda_get_return_value();
+    } else {
+#if VSF_FS_USE_MALFS == ENABLED
+        vk_malfs_mounter_t mounter;
+        mounter.dir = dir;
+        mounter.mal = (vk_mal_t *)data;
+        vk_malfs_mount_mbr(&mounter);
+        err = mounter.err;
+#else
+        err = VSF_ERR_NOT_SUPPORT;
+#endif
+    }
+
     close(fd);
-    if (VSF_ERR_NONE != dir->ctx.err) {
+    if (VSF_ERR_NONE != err) {
         return -1;
     }
     return 0;
@@ -1123,7 +1236,7 @@ int umount(const char *target)
     vk_file_t *dir = priv->file;
     vk_fs_unmount(dir);
     close(fd);
-    if (VSF_ERR_NONE != dir->ctx.err) {
+    if (VSF_ERR_NONE != (vsf_err_t)vsf_eda_get_return_value()) {
         return -1;
     }
     return 0;
@@ -1162,8 +1275,9 @@ int vsf_linux_fs_get_executable(const char *pathname, vsf_linux_main_entry_t *en
     return fd;
 }
 
-int vsf_linux_fs_bind_target(int fd, void *target, vsf_param_eda_evthandler_t read,
-        vsf_param_eda_evthandler_t write)
+int vsf_linux_fs_bind_target(int fd, void *target,
+        vsf_param_eda_evthandler_t peda_read,
+        vsf_param_eda_evthandler_t peda_write)
 {
     vk_vfs_file_t *vfs_file = vsf_linux_fs_get_vfs(fd);
     if (NULL == vfs_file) {
@@ -1171,8 +1285,8 @@ int vsf_linux_fs_bind_target(int fd, void *target, vsf_param_eda_evthandler_t re
     }
 
     vfs_file->f.data = target;
-    vfs_file->f.callback.read = read;
-    vfs_file->f.callback.write = write;
+    vfs_file->f.callback.fn_read = peda_read;
+    vfs_file->f.callback.fn_write = peda_write;
     return 0;
 }
 
@@ -1195,5 +1309,31 @@ int tcsetattr(int fd, int optional_actions, const struct termios *termios)
 {
     return 0;
 }
+
+#if VSF_KERNEL_CFG_EDA_SUPPORT_TIMER == ENABLED
+void usleep(int usec)
+{
+    vsf_teda_set_timer_us(usec);
+    vsf_thread_wfe(VSF_EVT_TIMER);
+}
+
+// TODO: wakeup after signal
+unsigned sleep(unsigned sec)
+{
+    vsf_teda_set_timer_ms(sec * 1000);
+    vsf_thread_wfe(VSF_EVT_TIMER);
+    return 0;
+}
+#endif
+
+// malloc.h
+void * memalign(size_t alignment, size_t size)
+{
+    return vsf_heap_malloc_aligned(size, alignment);
+}
+
+#if __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#endif
 
 #endif      // VSF_USE_LINUX

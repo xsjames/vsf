@@ -20,14 +20,20 @@
 #include "component/usb/vsf_usb_cfg.h"
 
 #if     VSF_USE_USB_HOST == ENABLED                                             \
-    &&  VSF_USE_USB_HOST_ECM == ENABLED                                         \
+    &&  VSF_USBH_USE_ECM == ENABLED                                             \
     &&  VSF_USE_TCPIP == ENABLED
 
-#define VSF_USBH_IMPLEMENT_CLASS
-#define VSF_USBH_CDC_INHERIT
-#define VSF_NETDRV_INHERIT_NETLINK
-#include "vsf.h"
-#include <ctype.h>
+#define __VSF_EDA_CLASS_INHERIT__
+#define __VSF_NETDRV_CLASS_INHERIT_NETLINK__
+#define __VSF_USBH_CDC_CLASS_INHERIT__
+#define __VSF_USBH_CLASS_IMPLEMENT_CLASS__
+
+// for ctype.h
+#include "utilities/vsf_utilities.h"
+#include "kernel/vsf_kernel.h"
+#include "../../vsf_usbh.h"
+#include "./vsf_usbh_CDCECM.h"
+#include "component/tcpip/vsf_tcpip.h"
 
 /*============================ MACROS ========================================*/
 
@@ -47,32 +53,27 @@
 #   define VSF_USBH_CDCECM_SUPPORT_PBUF     ENABLED
 #endif
 
-#define VSF_USBH_ECM_ETH_HEADER_SIZE    6
-#define VSF_USBH_ECM_MAC_STRING_SIZE    (2 + 2 * 2 * VSF_USBH_ECM_ETH_HEADER_SIZE)
+#define VSF_USBH_ECM_ETH_HEADER_SIZE        6
+#define VSF_USBH_ECM_MAC_STRING_SIZE        (2 + 2 * 2 * VSF_USBH_ECM_ETH_HEADER_SIZE)
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct vk_usbh_ecm_iocb_t {
-    void *netbuf;
-    vk_usbh_urb_t urb;
-};
-typedef struct vk_usbh_ecm_iocb_t vk_usbh_ecm_iocb_t;
-
-struct vk_usbh_ecm_ocb_t {
+typedef struct vk_usbh_ecm_iocb_t {
     void *netbuf;
     vk_usbh_urb_t urb;
 #if VSF_USBH_CDCECM_SUPPORT_PBUF == ENABLED
-    uint8_t buffer[1514];
+    uint8_t buffer[1500 + TCPIP_ETH_HEADSIZE];
 #endif
-};
-typedef struct vk_usbh_ecm_ocb_t vk_usbh_ecm_ocb_t;
+} vk_usbh_ecm_iocb_t;
+
+typedef struct vk_usbh_ecm_iocb_t vk_usbh_ecm_ocb_t;
 typedef struct vk_usbh_ecm_iocb_t vk_usbh_ecm_icb_t;
 
-struct vk_usbh_ecm_t {
+typedef struct vk_usbh_ecm_t {
     implement(vk_usbh_cdc_t)
 
-    vsf_netdrv_t netdrv;
+    vk_netdrv_t netdrv;
     vk_usbh_ecm_ocb_t ocb[VSF_USBH_CDCECM_CFG_NUM_OF_OCB];
     vk_usbh_ecm_icb_t icb[VSF_USBH_CDCECM_CFG_NUM_OF_ICB];
 
@@ -86,48 +87,46 @@ struct vk_usbh_ecm_t {
         VSF_USBH_ECM_INIT_WAIT_SET_IF0,
         VSF_USBH_ECM_INIT_WAIT_SET_IF1,
     } init_state;
-};
-typedef struct vk_usbh_ecm_t vk_usbh_ecm_t;
-
-/*============================ LOCAL VARIABLES ===============================*/
-
-static const vk_usbh_dev_id_t vk_usbh_ecm_dev_id[] = {
-    { VSF_USBH_MATCH_IFS_CLASS(USB_CLASS_COMM, 6, 0) },
-};
+} vk_usbh_ecm_t;
 
 /*============================ PROTOTYPES ====================================*/
 
-static void *vk_usbh_ecm_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs);
-static void vk_usbh_ecm_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param);
+static void *__vk_usbh_ecm_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs);
+static void __vk_usbh_ecm_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param);
+
+static vsf_err_t __vk_usbh_ecm_netlink_init(vk_netdrv_t *netdrv);
+static vsf_err_t __vk_usbh_ecm_netlink_fini(vk_netdrv_t *netdrv);
+static bool __vk_usbh_ecm_netlink_can_output(vk_netdrv_t *netdrv);
+static vsf_err_t __vk_usbh_ecm_netlink_output(vk_netdrv_t *netdrv, void *netbuf);
+
+/*============================ LOCAL VARIABLES ===============================*/
+
+static const vk_usbh_dev_id_t __vk_usbh_ecm_dev_id[] = {
+    { VSF_USBH_MATCH_IFS_CLASS(USB_CLASS_COMM, 6, 0) },
+};
+
+static const struct vk_netlink_op_t __vk_usbh_ecm_netlink_op =
+{
+    .init       = __vk_usbh_ecm_netlink_init,
+    .fini       = __vk_usbh_ecm_netlink_fini,
+    .can_output = __vk_usbh_ecm_netlink_can_output,
+    .output     = __vk_usbh_ecm_netlink_output,
+};
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
 const vk_usbh_class_drv_t vk_usbh_ecm_drv = {
     .name       = "cdc_ecm",
-    .dev_id_num = dimof(vk_usbh_ecm_dev_id),
-    .dev_ids    = vk_usbh_ecm_dev_id,
-    .probe      = vk_usbh_ecm_probe,
-    .disconnect = vk_usbh_ecm_disconnect,
+    .dev_id_num = dimof(__vk_usbh_ecm_dev_id),
+    .dev_ids    = __vk_usbh_ecm_dev_id,
+    .probe      = __vk_usbh_ecm_probe,
+    .disconnect = __vk_usbh_ecm_disconnect,
 };
 
 /*============================ PROTOTYPES ====================================*/
-
-SECTION(".text.vsf.kernel.eda")
-vsf_err_t __vsf_eda_fini(vsf_eda_t *pthis);
-
-#if     defined(WEAK_VSF_PNP_ON_NETDRV_NEW_EXTERN)                              \
-    &&  defined(WEAK_VSF_PNP_ON_NETDRV_NEW)
-WEAK_VSF_PNP_ON_NETDRV_NEW_EXTERN
-#endif
-
-#if     defined(WEAK_VSF_PNP_ON_NETDRV_DEL_EXTERN)                              \
-    &&  defined(WEAK_VSF_PNP_ON_NETDRV_DEL)
-WEAK_VSF_PNP_ON_NETDRV_DEL_EXTERN
-#endif
-
 /*============================ IMPLEMENTATION ================================*/
 
-static vk_usbh_ecm_icb_t * vk_usbh_ecm_get_icb(vk_usbh_ecm_t *ecm, vk_usbh_urb_t *urb)
+static vk_usbh_ecm_icb_t * __vk_usbh_ecm_get_icb(vk_usbh_ecm_t *ecm, vk_usbh_urb_t *urb)
 {
     vk_usbh_ecm_icb_t *icb = ecm->icb;
     for (int i = 0; i < dimof(ecm->icb); i++, icb++) {
@@ -138,7 +137,7 @@ static vk_usbh_ecm_icb_t * vk_usbh_ecm_get_icb(vk_usbh_ecm_t *ecm, vk_usbh_urb_t
     return NULL;
 }
 
-static vk_usbh_ecm_ocb_t * vk_usbh_ecm_get_ocb(vk_usbh_ecm_t *ecm, vk_usbh_urb_t *urb)
+static vk_usbh_ecm_ocb_t * __vk_usbh_ecm_get_ocb(vk_usbh_ecm_t *ecm, vk_usbh_urb_t *urb)
 {
     vk_usbh_ecm_ocb_t *ocb = ecm->ocb;
     for (int i = 0; i < dimof(ecm->ocb); i++, ocb++) {
@@ -149,7 +148,7 @@ static vk_usbh_ecm_ocb_t * vk_usbh_ecm_get_ocb(vk_usbh_ecm_t *ecm, vk_usbh_urb_t
     return NULL;
 }
 
-static vk_usbh_ecm_ocb_t * vk_usbh_ecm_get_idle_ocb(vk_usbh_ecm_t *ecm)
+static vk_usbh_ecm_ocb_t * __vk_usbh_ecm_get_idle_ocb(vk_usbh_ecm_t *ecm)
 {
     vk_usbh_ecm_ocb_t *ocb = ecm->ocb;
     for (int i = 0; i < dimof(ecm->ocb); i++, ocb++) {
@@ -160,23 +159,27 @@ static vk_usbh_ecm_ocb_t * vk_usbh_ecm_get_idle_ocb(vk_usbh_ecm_t *ecm)
     return NULL;
 }
 
-static void vk_usbh_ecm_recv(vk_usbh_ecm_t *ecm, vk_usbh_ecm_icb_t *icb)
+static void __vk_usbh_ecm_recv(vk_usbh_ecm_t *ecm, vk_usbh_ecm_icb_t *icb)
 {
     if (NULL == icb->netbuf) {
-        icb->netbuf = vsf_netdrv_alloc_buf(&ecm->netdrv);
+        icb->netbuf = vk_netdrv_alloc_buf(&ecm->netdrv);
         if (icb->netbuf != NULL) {
+#if VSF_USBH_CDCECM_SUPPORT_PBUF == ENABLED
+            vk_usbh_urb_set_buffer(&icb->urb, icb->buffer, sizeof(icb->buffer));
+#else
             vsf_mem_t mem;
-            void *netbuf = vsf_netdrv_read_buf(&ecm->netdrv, icb->netbuf, &mem);
+            void *netbuf = vk_netdrv_read_buf(&ecm->netdrv, icb->netbuf, &mem);
             VSF_USB_ASSERT(netbuf == NULL);
-            vk_usbh_urb_set_buffer(&icb->urb, mem.pchBuffer, mem.nSize);
+            vk_usbh_urb_set_buffer(&icb->urb, mem.buffer, mem.size);
+#endif
             if (VSF_ERR_NONE != vk_usbh_cdc_submit_urb(&ecm->use_as__vk_usbh_cdc_t, &icb->urb)) {
-                vsf_netdrv_on_inputted(&ecm->netdrv, icb->netbuf, 0);
+                vk_netdrv_on_inputted(&ecm->netdrv, icb->netbuf, 0);
             }
         }
     }
 }
 
-static vsf_err_t vk_usbh_ecm_netlink_init(vsf_netdrv_t *netdrv)
+static vsf_err_t __vk_usbh_ecm_netlink_init(vk_netdrv_t *netdrv)
 {
     vk_usbh_ecm_t *ecm = container_of(netdrv, vk_usbh_ecm_t, netdrv);
 
@@ -186,56 +189,52 @@ static vsf_err_t vk_usbh_ecm_netlink_init(vsf_netdrv_t *netdrv)
     return VSF_ERR_NONE;
 }
 
-static vsf_err_t vk_usbh_ecm_netlink_fini(vsf_netdrv_t *netdrv)
+static vsf_err_t __vk_usbh_ecm_netlink_fini(vk_netdrv_t *netdrv)
 {
     if (netdrv->is_to_free) {
         vk_usbh_ecm_t *ecm = container_of(netdrv, vk_usbh_ecm_t, netdrv);
-#ifndef WEAK_VSF_PNP_ON_NETDRV_DEL
         vsf_pnp_on_netdrv_del(&ecm->netdrv);
-#else
-        WEAK_VSF_PNP_ON_NETDRV_DEL(&ecm->netdrv);
-#endif
-        VSF_USBH_FREE(ecm);
+        vsf_usbh_free(ecm);
     }
     return VSF_ERR_NONE;
 }
 
-static bool vk_usbh_ecm_netlink_can_output(vsf_netdrv_t *netdrv)
+static bool __vk_usbh_ecm_netlink_can_output(vk_netdrv_t *netdrv)
 {
     vk_usbh_ecm_t *ecm = container_of(netdrv, vk_usbh_ecm_t, netdrv);
-    return NULL != vk_usbh_ecm_get_idle_ocb(ecm);
+    return NULL != __vk_usbh_ecm_get_idle_ocb(ecm);
 }
 
-static vsf_err_t vk_usbh_ecm_netlink_output(vsf_netdrv_t *netdrv, void *netbuf)
+static vsf_err_t __vk_usbh_ecm_netlink_output(vk_netdrv_t *netdrv, void *netbuf)
 {
     vk_usbh_ecm_t *ecm = container_of(netdrv, vk_usbh_ecm_t, netdrv);
-    vk_usbh_ecm_ocb_t *ocb = vk_usbh_ecm_get_idle_ocb(ecm);
+    vk_usbh_ecm_ocb_t *ocb = __vk_usbh_ecm_get_idle_ocb(ecm);
     vsf_err_t err = VSF_ERR_FAIL;
     vsf_mem_t mem;
 
     ocb->netbuf = netbuf;
 #if VSF_USBH_CDCECM_SUPPORT_PBUF == ENABLED
-    if ((netbuf = vsf_netdrv_read_buf(netdrv, netbuf, &mem)) != NULL) {
+    if ((netbuf = vk_netdrv_read_buf(netdrv, netbuf, &mem)) != NULL) {
         uint_fast16_t pos = 0;
         do {
-            VSF_USB_ASSERT((mem.nSize + pos) <= sizeof(ocb->buffer));
-            memcpy(&ocb->buffer[pos], mem.pchBuffer, mem.nSize);
-            pos += mem.nSize;
-        } while ((netbuf = vsf_netdrv_read_buf(netdrv, netbuf, &mem)) != NULL);
-        mem.pchBuffer = ocb->buffer;
-        mem.nSize = pos;
+            VSF_USB_ASSERT((mem.size + pos) <= sizeof(ocb->buffer));
+            memcpy(&ocb->buffer[pos], mem.buffer, mem.size);
+            pos += mem.size;
+        } while ((netbuf = vk_netdrv_read_buf(netdrv, netbuf, &mem)) != NULL);
+        mem.buffer = ocb->buffer;
+        mem.size = pos;
     }
 #else
-    if (vsf_netdrv_read_buf(netdrv, netbuf, &mem) != NULL) {
+    if (vk_netdrv_read_buf(netdrv, netbuf, &mem) != NULL) {
         VSF_USB_ASSERT(false);
     }
 #endif
 
 #if VSF_USBH_CDCECM_CFG_TRACE_DATA_EN == ENABLED
-    vsf_trace(VSF_TRACE_DEBUG, "ecm_output :" VSF_TRACE_CFG_LINEEND);
-    vsf_trace_buffer(VSF_TRACE_DEBUG, mem.pchBuffer, mem.nSize, VSF_TRACE_DF_DEFAULT);
+    vsf_trace_debug("ecm_output :" VSF_TRACE_CFG_LINEEND);
+    vsf_trace_buffer(VSF_TRACE_DEBUG, mem.buffer, mem.size, VSF_TRACE_DF_DEFAULT);
 #endif
-    vk_usbh_urb_set_buffer(&ocb->urb, mem.pchBuffer, mem.nSize);
+    vk_usbh_urb_set_buffer(&ocb->urb, mem.buffer, mem.size);
     err = vk_usbh_cdc_submit_urb(&ecm->use_as__vk_usbh_cdc_t, &ocb->urb);
     if (err != VSF_ERR_NONE) {
         ocb->netbuf = NULL;
@@ -243,15 +242,7 @@ static vsf_err_t vk_usbh_ecm_netlink_output(vsf_netdrv_t *netdrv, void *netbuf)
     return err;
 }
 
-static const struct vsf_netlink_op_t vk_usbh_ecm_netlink_op =
-{
-    .init       = vk_usbh_ecm_netlink_init,
-    .fini       = vk_usbh_ecm_netlink_fini,
-    .can_output = vk_usbh_ecm_netlink_can_output,
-    .output     = vk_usbh_ecm_netlink_output,
-};
-
-static vsf_err_t vk_usbh_ecm_on_cdc_evt(vk_usbh_cdc_t *cdc, vk_usbh_cdc_evt_t evt, void *param)
+static vsf_err_t __vk_usbh_ecm_on_cdc_evt(vk_usbh_cdc_t *cdc, vk_usbh_cdc_evt_t evt, void *param)
 {
     vk_usbh_ecm_t *ecm = (vk_usbh_ecm_t *)cdc;
 
@@ -264,8 +255,7 @@ static vsf_err_t vk_usbh_ecm_on_cdc_evt(vk_usbh_cdc_t *cdc, vk_usbh_cdc_evt_t ev
             vk_usbh_cdc_prepare_urb(&ecm->use_as__vk_usbh_cdc_t, true, &ecm->ocb[i].urb);
         }
         break;
-    case VSF_USBH_CDC_ON_DESC:
-        do {
+    case VSF_USBH_CDC_ON_DESC: {
             usb_cdc_ecm_descriptor_t *ecm_desc = param;
 
             switch (ecm_desc->bDescriptorSubType) {
@@ -274,39 +264,37 @@ static vsf_err_t vk_usbh_ecm_on_cdc_evt(vk_usbh_cdc_t *cdc, vk_usbh_cdc_evt_t ev
                 ecm->max_segment_size = le16_to_cpu(ecm_desc->wMaxSegmentSize);
                 break;
             }
-        } while (0);
+        }
         break;
     case VSF_USBH_CDC_ON_EVENT:
         switch (ecm->evt[1]) {
-        case 0x00:            // NETWORK_CONNECTION
-            do {
-                bool connected = vsf_netdrv_is_connected(&ecm->netdrv);
+        case 0x00: {          // NETWORK_CONNECTION
+                bool connected = vk_netdrv_is_connected(&ecm->netdrv);
                 if (connected && ecm->evt[2] == 0) {
-                    vsf_trace(VSF_TRACE_INFO, "ecm_event: NETWORK_CONNECTION Disconnected" VSF_TRACE_CFG_LINEEND);
-                    vsf_netdrv_disconnect(&ecm->netdrv);
+                    vsf_trace_info("ecm_event: NETWORK_CONNECTION Disconnected" VSF_TRACE_CFG_LINEEND);
+                    vk_netdrv_disconnect(&ecm->netdrv);
                 } else if (!connected && (ecm->evt[2] != 0)) {
-                    vsf_trace(VSF_TRACE_INFO, "ecm_event: NETWORK_CONNECTION Connected" VSF_TRACE_CFG_LINEEND);
-                    vsf_netdrv_connect(&ecm->netdrv);
+                    vsf_trace_info("ecm_event: NETWORK_CONNECTION Connected" VSF_TRACE_CFG_LINEEND);
+                    vk_netdrv_connect(&ecm->netdrv);
 
                     vk_usbh_ecm_icb_t *icb = ecm->icb;
                     for (int i = 0; i < dimof(ecm->icb); i++, icb++) {
-                        vk_usbh_ecm_recv(ecm, icb);
+                        __vk_usbh_ecm_recv(ecm, icb);
                     }
                 }
-            } while (0);
+            }
             break;
         case 0x2A:            // CONNECTION_SPEED_CHANGE
-//            vsf_trace(VSF_TRACE_INFO, "ecm_event: CONNECTION_SPEED_CHANGE" VSF_TRACE_CFG_LINEEND);
+//            vsf_trace_info("ecm_event: CONNECTION_SPEED_CHANGE" VSF_TRACE_CFG_LINEEND);
             break;
         default:
-            vsf_trace(VSF_TRACE_ERROR, "ecm_event: unknown(%d)" VSF_TRACE_CFG_LINEEND, ecm->evt[0]);
+            vsf_trace_error("ecm_event: unknown(%d)" VSF_TRACE_CFG_LINEEND, ecm->evt[0]);
             break;
         }
         break;
-    case VSF_USBH_CDC_ON_RX:
-        do {
+    case VSF_USBH_CDC_ON_RX: {
             int_fast32_t size;
-            vk_usbh_ecm_icb_t *icb = vk_usbh_ecm_get_icb(ecm, (vk_usbh_urb_t *)param);
+            vk_usbh_ecm_icb_t *icb = __vk_usbh_ecm_get_icb(ecm, (vk_usbh_urb_t *)param);
 
             if (URB_OK != vk_usbh_urb_get_status(&icb->urb)) {
                 size = -1;
@@ -315,30 +303,47 @@ static vsf_err_t vk_usbh_ecm_on_cdc_evt(vk_usbh_cdc_t *cdc, vk_usbh_cdc_evt_t ev
             }
 
             if (size > 0) {
+                vsf_mem_t mem;
+                vk_netdrv_t *netdrv = &ecm->netdrv;
+
+#if VSF_USBH_CDCECM_SUPPORT_PBUF == ENABLED
+                void *netbuf = icb->netbuf;
+                uint_fast32_t remain = size;
+                size_t cur_size;
+                uint8_t *buffer = icb->buffer;
+
+#   if VSF_USBH_CDCECM_CFG_TRACE_DATA_EN == ENABLED
+                vsf_trace_debug("ecm_input :" VSF_TRACE_CFG_LINEEND);
+                vsf_trace_buffer(VSF_TRACE_DEBUG, buffer, remain, VSF_TRACE_DF_DEFAULT);
+#   endif
+
                 do {
-                    vsf_mem_t mem;
-                    vsf_netdrv_t *netdrv = &ecm->netdrv;
-
-                    if (!vsf_netdrv_read_buf(netdrv, icb->netbuf, &mem)) {
-#if VSF_USBH_CDCECM_CFG_TRACE_DATA_EN == ENABLED
-                        vsf_trace(VSF_TRACE_DEBUG, "ecm_input :" VSF_TRACE_CFG_LINEEND);
-                        vsf_trace_buffer(VSF_TRACE_DEBUG, mem.pchBuffer, size, VSF_TRACE_DF_DEFAULT);
+                    netbuf = vk_netdrv_read_buf(netdrv, netbuf, &mem);
+                    cur_size = min(mem.size, remain);
+                    memcpy(mem.buffer, buffer, cur_size);
+                    remain -= cur_size;
+                    buffer += cur_size;
+                } while ((netbuf != NULL) && (remain > 0));
+#else
+                if (!vk_netdrv_read_buf(netdrv, icb->netbuf, &mem)) {
+#   if VSF_USBH_CDCECM_CFG_TRACE_DATA_EN == ENABLED
+                    vsf_trace_debug("ecm_input :" VSF_TRACE_CFG_LINEEND);
+                    vsf_trace_buffer(VSF_TRACE_DEBUG, mem.buffer, size, VSF_TRACE_DF_DEFAULT);
+#   endif
+                }
 #endif
-                    }
-                } while (0);
             }
 
-            vsf_netdrv_on_inputted(&ecm->netdrv, icb->netbuf, size);
+            vk_netdrv_on_inputted(&ecm->netdrv, icb->netbuf, size);
             icb->netbuf = NULL;
-            if (vsf_netdrv_is_connected(&ecm->netdrv)) {
-                vk_usbh_ecm_recv(ecm, icb);
+            if (vk_netdrv_is_connected(&ecm->netdrv)) {
+                __vk_usbh_ecm_recv(ecm, icb);
             }
-        } while (0);
+        }
         break;
-    case VSF_USBH_CDC_ON_TX:
-        do {
+    case VSF_USBH_CDC_ON_TX: {
             int_fast32_t size;
-            vk_usbh_ecm_ocb_t *ocb = vk_usbh_ecm_get_ocb(ecm, (vk_usbh_urb_t *)param);
+            vk_usbh_ecm_ocb_t *ocb = __vk_usbh_ecm_get_ocb(ecm, (vk_usbh_urb_t *)param);
 
             if (URB_OK != vk_usbh_urb_get_status(&ocb->urb)) {
                 size = -1;
@@ -346,25 +351,28 @@ static vsf_err_t vk_usbh_ecm_on_cdc_evt(vk_usbh_cdc_t *cdc, vk_usbh_cdc_evt_t ev
                 size = vk_usbh_urb_get_actual_length(&ocb->urb);
             }
 
-            vsf_netdrv_on_outputted(&ecm->netdrv, ocb->netbuf, size);
+            vk_netdrv_on_outputted(&ecm->netdrv, ocb->netbuf, size);
             ocb->netbuf = NULL;
-        } while (0);
+        }
         break;
     }
     return VSF_ERR_NONE;
 }
 
-static int hex_to_bin(char ch)
+// TODO: move hex_to_bin to misc
+int hex_to_bin(char ch)
 {
-    if ((ch >= '0') && (ch <= '9'))
+    if ((ch >= '0') && (ch <= '9')) {
         return ch - '0';
+    }
     ch = tolower(ch);
-    if ((ch >= 'a') && (ch <= 'f'))
+    if ((ch >= 'a') && (ch <= 'f')) {
         return ch - 'a' + 10;
+    }
     return -1;
 }
 
-static void vk_usbh_ecm_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
+static void __vk_usbh_ecm_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
 {
     vk_usbh_cdc_t *cdc = container_of(eda, vk_usbh_cdc_t, eda);
     vk_usbh_ecm_t *ecm = container_of(cdc, vk_usbh_ecm_t, use_as__vk_usbh_cdc_t);
@@ -400,16 +408,16 @@ static void vk_usbh_ecm_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
                 break;
             }
 
-            do {
+            {
                 char *str = (char *)vk_usbh_urb_take_buffer(urb) + 2;
                 for (uint_fast8_t i = 0; i < VSF_USBH_ECM_ETH_HEADER_SIZE; i++, str += 4) {
                     ecm->netdrv.macaddr.addr_buf[i] = (hex_to_bin(str[0]) << 4) | (hex_to_bin(str[2]) << 0);
                 }
                 ecm->netdrv.macaddr.size = VSF_USBH_ECM_ETH_HEADER_SIZE;
-            } while (0);
+            }
             vk_usbh_urb_free_buffer(urb);
 
-            vsf_trace(VSF_TRACE_INFO, "cdc_cdc: MAC is %02X:%02X:%02X:%02X:%02X:%02X" VSF_TRACE_CFG_LINEEND,
+            vsf_trace_info("cdc_cdc: MAC is %02X:%02X:%02X:%02X:%02X:%02X" VSF_TRACE_CFG_LINEEND,
                     ecm->netdrv.macaddr.addr_buf[0], ecm->netdrv.macaddr.addr_buf[1],
                     ecm->netdrv.macaddr.addr_buf[2], ecm->netdrv.macaddr.addr_buf[3],
                     ecm->netdrv.macaddr.addr_buf[4], ecm->netdrv.macaddr.addr_buf[5]);
@@ -422,18 +430,10 @@ static void vk_usbh_ecm_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
         case VSF_USBH_ECM_INIT_WAIT_SET_IF1:
             __vsf_eda_crit_npb_leave(&dev->ep0.crit);
 
-            ecm->netdrv.netlink_op = &vk_usbh_ecm_netlink_op;
-#ifndef WEAK_VSF_PNP_ON_NETDRV_NEW
+            ecm->netdrv.netlink.op = &__vk_usbh_ecm_netlink_op;
             vsf_pnp_on_netdrv_new(&ecm->netdrv);
-#else
-            WEAK_VSF_PNP_ON_NETDRV_NEW(&ecm->netdrv);
-#endif
 
-            if (VSF_ERR_NONE != vsf_eda_set_evthandler( eda, 
-                                                        vk_usbh_cdc_evthandler)) {
-                VSF_USB_ASSERT(false);
-            }
-            //eda->evthandler = vk_usbh_cdc_evthandler;
+            eda->fn.evthandler = vk_usbh_cdc_evthandler;
             vsf_eda_post_evt(eda, VSF_EVT_INIT);
             return;
         }
@@ -449,46 +449,41 @@ static void vk_usbh_ecm_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
     }
 }
 
-static void vk_usbh_ecm_on_eda_terminate(vsf_eda_t *eda)
+static void __vk_usbh_ecm_on_eda_terminate(vsf_eda_t *eda)
 {
     vk_usbh_ecm_t *ecm = container_of(eda, vk_usbh_ecm_t, eda);
-    vsf_netdrv_t *netdrv = &ecm->netdrv;
+    vk_netdrv_t *netdrv = &ecm->netdrv;
 
     netdrv->is_to_free = true;
-    if (vsf_netdrv_is_connected(netdrv)) {
-        vsf_netdrv_disconnect(netdrv);
+    if (vk_netdrv_is_connected(netdrv)) {
+        vk_netdrv_disconnect(netdrv);
     } else {
-        vk_usbh_ecm_netlink_fini(netdrv);
+        __vk_usbh_ecm_netlink_fini(netdrv);
     }
 }
 
-static void *vk_usbh_ecm_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs)
+static void *__vk_usbh_ecm_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs)
 {
-    vk_usbh_ecm_t *ecm = VSF_USBH_MALLOC(sizeof(vk_usbh_ecm_t));
+    vk_usbh_ecm_t *ecm = vsf_usbh_malloc(sizeof(vk_usbh_ecm_t));
     if (ecm != NULL) {
         vk_usbh_cdc_t *cdc = &ecm->use_as__vk_usbh_cdc_t;
         memset(ecm, 0, sizeof(*ecm));
-        cdc->evthandler = vk_usbh_ecm_on_cdc_evt;
+        cdc->evthandler = __vk_usbh_ecm_on_cdc_evt;
         cdc->evt_buffer = ecm->evt;
         cdc->evt_size = sizeof(ecm->evt);
         if (VSF_ERR_NONE != vk_usbh_cdc_init(cdc, usbh, dev, parser_ifs)) {
-            VSF_USBH_FREE(ecm);
+            vsf_usbh_free(ecm);
             ecm = NULL;
         } else {
-
-            if (VSF_ERR_NONE != vsf_eda_set_evthandler( &(cdc->eda), 
-                                                        vk_usbh_ecm_evthandler)) {
-                VSF_USB_ASSERT(false);
-            }
-            //cdc->eda.evthandler = vk_usbh_ecm_evthandler;
-            cdc->eda.on_terminate = vk_usbh_ecm_on_eda_terminate;
+            cdc->eda.fn.evthandler = __vk_usbh_ecm_evthandler;
+            cdc->eda.on_terminate = __vk_usbh_ecm_on_eda_terminate;
             vsf_eda_init(&cdc->eda, vsf_prio_inherit, false);
         }
     }
     return ecm;
 }
 
-static void vk_usbh_ecm_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param)
+static void __vk_usbh_ecm_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param)
 {
     vk_usbh_ecm_t *ecm = (vk_usbh_ecm_t *)param;
 
@@ -500,7 +495,7 @@ static void vk_usbh_ecm_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *pa
     }
 
     vk_usbh_cdc_fini(&ecm->use_as__vk_usbh_cdc_t);
-    __vsf_eda_fini(&ecm->eda);
+    vsf_eda_fini(&ecm->eda);
 }
 
 #endif

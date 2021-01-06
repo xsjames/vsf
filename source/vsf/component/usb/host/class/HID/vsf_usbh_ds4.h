@@ -22,33 +22,48 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if VSF_USE_USB_HOST == ENABLED && VSF_USE_USB_HOST_DS4 == ENABLED
+#if VSF_USE_USB_HOST == ENABLED && VSF_USBH_USE_DS4 == ENABLED
 
 #include "component/usb/common/class/HID/vsf_usb_ds4.h"
-#if VSF_USE_INPUT_DS4 == ENABLED
-#   include "component/input/driver/ds4/vsf_input_ds4.h"
+#if VSF_USE_INPUT == ENABLED && VSF_INPUT_USE_DS4 == ENABLED
+#   include "component/input/vsf_input.h"
 #endif
 
-#if     defined(VSF_USBH_DS4_IMPLEMENT)
-#   undef VSF_USBH_DS4_IMPLEMENT
-#   define __PLOOC_CLASS_IMPLEMENT
+#if     defined(__VSF_USBH_DS4_CLASS_IMPLEMENT)
+#   undef __VSF_USBH_DS4_CLASS_IMPLEMENT
+#   define __PLOOC_CLASS_IMPLEMENT__
 #endif
 #include "utilities/ooc_class.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*============================ MACROS ========================================*/
 
-#if VSF_USE_USB_HOST_HID != ENABLED
-#   error "DS4 driver need VSF_USE_USB_HOST_HID"
+#if VSF_USBH_USE_HID != ENABLED
+#   error "DS4 driver need VSF_USBH_USE_HID"
 #endif
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-declare_simple_class(vk_usbh_ds4_t)
+#if VSF_USE_INPUT == ENABLED && VSF_INPUT_USE_DS4 == ENABLED
+enum {
+    VSF_INPUT_TYPE_DS4 = VSF_INPUT_USER_TYPE,
+};
+
+typedef struct vk_input_ds4u_t {
+    vsf_usb_ds4_gamepad_in_report_t data;
+    vk_input_timestamp_t timestamp;
+} vk_input_ds4u_t;
+#endif
+
+dcl_simple_class(vk_usbh_ds4_t)
 
 def_simple_class(vk_usbh_ds4_t) {
     implement(vk_usbh_hid_teda_t)
-#if VSF_USE_INPUT == ENABLED && VSF_USE_INPUT_DS4 == ENABLED
+#if VSF_USE_INPUT == ENABLED && VSF_INPUT_USE_DS4 == ENABLED
     implement(vk_input_ds4u_t)
 #endif
 
@@ -60,13 +75,28 @@ def_simple_class(vk_usbh_ds4_t) {
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
+#if VSF_USE_INPUT == ENABLED && VSF_INPUT_USE_DS4 == ENABLED
+extern const vk_input_item_info_t vk_ds4u_gamepad_item_info[GAMEPAD_ID_NUM];
+extern const vk_sensor_item_info_t vk_ds4u_sensor_item_info[6];
+#endif
+
 extern const vk_usbh_class_drv_t vk_usbh_ds4_drv;
 
 /*============================ PROTOTYPES ====================================*/
+
+#if VSF_USE_INPUT == ENABLED && VSF_INPUT_USE_DS4 == ENABLED
+extern void vk_ds4u_process_input(vk_input_ds4u_t *dev, vsf_usb_ds4_gamepad_in_report_t *data);
+extern void vk_ds4u_new_dev(vk_input_ds4u_t *dev);
+extern void vk_ds4u_free_dev(vk_input_ds4u_t *dev);
+#endif
 
 extern bool vk_usbh_ds4_can_output(vk_usbh_ds4_t *ds4);
 extern void vk_usbh_ds4_set_rumble(vk_usbh_ds4_t *ds4, uint_fast8_t left, uint_fast8_t right);
 extern void vk_usbh_ds4_set_led(vk_usbh_ds4_t *ds4, uint_fast8_t r, uint_fast8_t g, uint_fast8_t b);
 
-#endif      // VSF_USE_USB_HOST && VSF_USE_USB_HOST_DS4
+#ifdef __cplusplus
+}
+#endif
+
+#endif      // VSF_USE_USB_HOST && VSF_USBH_USE_DS4
 #endif      // __VSF_USBH_DS4_H__

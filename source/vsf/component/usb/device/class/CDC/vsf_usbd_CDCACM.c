@@ -19,85 +19,81 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if VSF_USE_USB_DEVICE == ENABLED && VSF_USE_USB_DEVICE_CDCACM == ENABLED
+#if VSF_USE_USB_DEVICE == ENABLED && VSF_USBD_USE_CDCACM == ENABLED
 
-#define VSF_USBD_INHERIT
-#define VSF_USBD_CDC_INHERIT
-#define VSF_USBD_CDCACM_IMPLEMENT
-// TODO: use dedicated include
-#include "vsf.h"
+#define __VSF_USBD_CLASS_INHERIT__
+#define __VSF_USBD_CDC_CLASS_INHERIT__
+#define __VSF_USBD_CDCACM_CLASS_IMPLEMENT
+
+#include "kernel/vsf_kernel.h"
+#include "../../vsf_usbd.h"
+#include "./vsf_usbd_CDCACM.h"
 
 /*============================ MACROS ========================================*/
-#undef this
-#define this        (*obj)
-
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 /*============================ PROTOTYPES ====================================*/
 
-static vsf_err_t vk_usbd_cdcacm_data_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs);
-static vsf_err_t vk_usbd_cdcacm_control_request_prepare(
+static vsf_err_t __vk_usbd_cdcacm_data_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs);
+static vsf_err_t __vk_usbd_cdcacm_control_request_prepare(
         vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs);
-static vsf_err_t vk_usbd_cdcacm_control_request_process(
+static vsf_err_t __vk_usbd_cdcacm_control_request_process(
         vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs);
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
 const vk_usbd_class_op_t vk_usbd_cdcacm_control =
 {
-    .request_prepare = vk_usbd_cdcacm_control_request_prepare,
-    .request_process = vk_usbd_cdcacm_control_request_process,
+    .request_prepare = __vk_usbd_cdcacm_control_request_prepare,
+    .request_process = __vk_usbd_cdcacm_control_request_process,
 };
 
 const vk_usbd_class_op_t vk_usbd_cdcacm_data =
 {
-    .init = vk_usbd_cdcacm_data_init,
+    .init = __vk_usbd_cdcacm_data_init,
 };
 
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ IMPLEMENTATION ================================*/
 
-vsf_err_t vk_usbd_cdcacm_init( vk_usbd_cdcacm_t *obj, 
-                                const vk_usbd_cdcacm_cfg_t *cfg)
+vsf_err_t vk_usbd_cdcacm_init(vk_usbd_cdcacm_t *cdcacm, const vk_usbd_cdcacm_cfg_t *cfg)
 {
-    VSF_USB_ASSERT(NULL != obj && NULL != cfg);
+    VSF_USB_ASSERT(NULL != cdcacm && NULL != cfg);
 
-    memset(obj, 0, sizeof(vk_usbd_cdcacm_t));
-    this.use_as__vk_usbd_cdc_t.ep.ep_cfg = cfg->ep.ep_cfg;
+    memset(cdcacm, 0, sizeof(vk_usbd_cdcacm_t));
+    cdcacm->use_as__vk_usbd_cdc_t.ep.ep_cfg = cfg->ep.ep_cfg;
 
-
-    this.line_coding = (usb_cdcacm_line_coding_t){
+    cdcacm->line_coding = (usb_cdcacm_line_coding_t) {
                 .bitrate        = 115200,
                 .stop           = 0,
                 .parity         = 0,
                 .datalen        = 8,
             };
-#if     VSF_USE_SERVICE_VSFSTREAM == ENABLED
-    VSF_USB_ASSERT(     (NULL != cfg->rx_stream) 
-            &&  (NULL != cfg->tx_stream));
 
-    this.stream.rx.stream = cfg->rx_stream;
-    this.stream.tx.stream = cfg->tx_stream;
+#if     VSF_USE_SIMPLE_STREAM == ENABLED
+    VSF_USB_ASSERT((NULL != cfg->rx_stream) && (NULL != cfg->tx_stream));
 
-#elif   VSF_USE_SERVICE_STREAM == ENABLED
-    vsf_stream_usr_init(&(this.use_as__vk_usbd_cdc_t.stream.use_as__vk_usbd_ep_stream_t.use_as__vsf_stream_usr_t),
+    cdcacm->stream.rx.stream = cfg->rx_stream;
+    cdcacm->stream.tx.stream = cfg->tx_stream;
+
+#elif   VSF_USE_STREAM == ENABLED
+    vsf_stream_usr_init(&(cdcacm->use_as__vk_usbd_cdc_t.stream.use_as__vk_usbd_ep_stream_t.use_as__vsf_stream_usr_t),
                         &cfg->stream_usr);
-    vsf_stream_src_init(&(this.use_as__vk_usbd_cdc_t.stream.use_as__vk_usbd_ep_stream_t.use_as__vsf_stream_src_t),
+    vsf_stream_src_init(&(cdcacm->use_as__vk_usbd_cdc_t.stream.use_as__vk_usbd_ep_stream_t.use_as__vsf_stream_src_t),
                         &cfg->stream_src);
 
-    do {
+    {
         vk_usbd_ep_stream_cfg_t cfg = {
-            .rx_ep = this.use_as__vk_usbd_cdc_t.ep.out,
-            .tx_ep = this.use_as__vk_usbd_cdc_t.ep.in,
+            .rx_ep = cdcacm->use_as__vk_usbd_cdc_t.ep.out,
+            .tx_ep = cdcacm->use_as__vk_usbd_cdc_t.ep.in,
         };
-        vk_usbd_ep_stream_init(&this.use_as__vk_usbd_cdc_t.stream.use_as__vk_usbd_ep_stream_t, &cfg);
-        
-    } while(0);
+        vk_usbd_ep_stream_init(&cdcacm->use_as__vk_usbd_cdc_t.stream.use_as__vk_usbd_ep_stream_t, &cfg);
+    }
 #endif
     return VSF_ERR_NONE;
 }
 
-static vsf_err_t vk_usbd_cdcacm_data_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs)
+static vsf_err_t __vk_usbd_cdcacm_data_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs)
 {
     vk_usbd_cdcacm_t *acm = ifs->class_param;
 
@@ -109,7 +105,7 @@ static vsf_err_t vk_usbd_cdcacm_data_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs
     return vk_usbd_cdc_data.init(dev, ifs);
 }
 
-static vsf_err_t vk_usbd_cdcacm_control_request_prepare(
+static vsf_err_t __vk_usbd_cdcacm_control_request_prepare(
         vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs)
 {
     vk_usbd_cdcacm_t *acm = ifs->class_param;
@@ -160,12 +156,12 @@ static vsf_err_t vk_usbd_cdcacm_control_request_prepare(
         return vk_usbd_cdc_control.request_prepare(dev, ifs);
     }
 
-    ctrl_handler->trans.use_as__vsf_mem_t.pchBuffer = buffer;
-    ctrl_handler->trans.use_as__vsf_mem_t.nSize = size;
+    ctrl_handler->trans.use_as__vsf_mem_t.buffer = buffer;
+    ctrl_handler->trans.use_as__vsf_mem_t.size = size;
     return VSF_ERR_NONE;
 }
 
-static vsf_err_t vk_usbd_cdcacm_control_request_process(
+static vsf_err_t __vk_usbd_cdcacm_control_request_process(
         vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs)
 {
     vk_usbd_cdcacm_t *acm = ifs->class_param;
@@ -192,4 +188,4 @@ static vsf_err_t vk_usbd_cdcacm_control_request_process(
     return VSF_ERR_NONE;
 }
 
-#endif  // VSF_USE_USB_DEVICE && VSF_USE_USB_DEVICE_CDCACM
+#endif  // VSF_USE_USB_DEVICE && VSF_USBD_USE_CDCACM

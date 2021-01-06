@@ -24,12 +24,12 @@
 /*============================ INCLUDES ======================================*/
 /*============================ MACROS ========================================*/
 
-//#define ASSERT(...)         if (!(__VA_ARGS__)) {SAFE_ATOM_CODE() {while(1);}};
+//#define ASSERT(...)         if (!(__VA_ARGS__)) {vsf_interrupt_safe() {while(1);}};
 #define ASSERT(...)
 
 #define VSF_SYSTIMER_FREQ               25000000ul
 
-#define VSF_HEAP_SIZE                   4096
+#define VSF_HEAP_SIZE                   2048
 
 //-------- <<< Use Configuration Wizard in Context Menu >>> --------------------
 
@@ -74,6 +74,8 @@
 //      </h>
 //  </h>
 //! @}
+
+#define VSF_USE_TRACE                       DISABLED
 
 //#define VSF_POOL_LOCK()             
 //#define VSF_POOL_UNLOCK()

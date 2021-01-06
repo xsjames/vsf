@@ -1,5 +1,5 @@
 /*****************************************************************************
- *   Copyright(C)2009-2019 by VSF Team                                       *
+ *   Copyright(C)2009-2020 by VSF Team                                       *
  *                                                                           *
  *  Licensed under the Apache License, Version 2.0 (the "License");          *
  *  you may not use this file except in compliance with the License.         *
@@ -15,16 +15,10 @@
  *                                                                           *
  ****************************************************************************/
 
-#ifndef __USE_RV_COMPILER_H__
-#define __USE_RV_COMPILER_H__
+#ifndef __USE_RV_COMPILER_H_PART_1__
+#define __USE_RV_COMPILER_H_PART_1__
 
 /*============================ INCLUDES ======================================*/
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
-
 #ifndef VSF_UTILITIES_REQ___RV_HEADER_FILE__FROM_USR
 #include "./RISCV/riscv_compiler.h"
 #else
@@ -60,6 +54,10 @@
 #endif
 //! @}
 
+#endif /* end of __USE_RV_COMPILER_H_PART_1__ */
+
+
+/*========================== Multiple-Entry Start ============================*/
 
 #if __IS_COMPILER_IAR__
 #   include <intrinsics.h>
@@ -68,6 +66,14 @@
 #include "./type.h"
 #include "../__common/__compiler.h"
 
+/*========================== Multiple-Entry End ==============================*/
+
+#ifndef __USE_RV_COMPILER_H_PART_2__
+#define __USE_RV_COMPILER_H_PART_2__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* -----------------  Start of section using anonymous unions  -------------- */
 #if __IS_COMPILER_IAR__
@@ -145,12 +151,11 @@ typedef uint32_t   vsf_gint_state_t;
 #endif
 
 /*============================ TYPES =========================================*/
-/*============================ INCLUDES ======================================*/
-
-//! \brief for interrupt 
-#include "./signal.h"
-
 /*============================ PROTOTYPES ====================================*/
 extern void vsf_stdio_init(void);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* end of __USE_RV_COMPILER_H_PART_2__ */

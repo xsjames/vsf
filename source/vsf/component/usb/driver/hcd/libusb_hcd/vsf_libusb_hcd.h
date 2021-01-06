@@ -21,17 +21,21 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if VSF_USE_USB_HOST == ENABLED && VSF_USE_USB_HOST_HCD_LIBUSB == ENABLED
+#if VSF_USE_USB_HOST == ENABLED && VSF_USBH_USE_HCD_LIBUSB == ENABLED
 
 #include "component/usb/host/vsf_usbh.h"
-#include "hal/interface/vsf_interface_usb.h"
+#include "hal/vsf_hal.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 
 #if VSF_USBH_CFG_ENABLE_ROOT_HUB == ENABLED
 #   error "libusb_hcd does not support root hub"
 #endif
-#if VSF_USE_USB_HOST_HUB == ENABLED
+#if VSF_USBH_USE_HUB == ENABLED
 #   error "libusb_hcd does not support hub"
 #endif
 #if !defined(__CPU_X86__) && !defined(__CPU_X64__)
@@ -41,17 +45,19 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct vsf_libusb_hcd_param_t {
+typedef struct vk_libusb_hcd_param_t {
     vsf_arch_prio_t priority;
-};
-typedef struct vsf_libusb_hcd_param_t vsf_libusb_hcd_param_t;
+} vk_libusb_hcd_param_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
-extern const vk_usbh_hcd_drv_t vsf_libusb_hcd_drv;
+extern const vk_usbh_hcd_drv_t vk_libusb_hcd_drv;
 
 /*============================ PROTOTYPES ====================================*/
 
+#ifdef __cplusplus
+}
 #endif
 
+#endif
 #endif // __VSF_LIBUSB_HCD_H___

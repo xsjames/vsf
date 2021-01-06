@@ -17,7 +17,9 @@
 
 /*============================ INCLUDES ======================================*/
 #include "hal/vsf_hal_cfg.h"
+#include "utilities/vsf_utilities.h"
 #include "./i_io_systick.h"
+#include "hal/arch/vsf_arch.h"
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -27,17 +29,20 @@
  *!         disable it:
  *!
  *!         #define __SYSTICK_ATOM_CODE(...)        \
- *!             for (int TPASTE2(___, __LINE__) =1;TPASTE2(___, __LINE__)--;)
+ *!             for (int __CONNECT2(___, __LINE__) =1;__CONNECT2(___, __LINE__)--;)
  *!                 
  *!         
  *!         NOTE: This macro should be defined in app_cfg.h or vsf_cfg.h
  */
 
 #ifndef __SYSTICK_ATOM_CODE
-#   define __SYSTICK_ATOM_CODE  __SAFE_ATOM_CODE
+#   define __SYSTICK_ATOM_CODE              __vsf_interrupt_safe
 #endif
 
 /*============================ TYPES =========================================*/
+
+// TODO: should em_systick_cfg_mode_t and systick_cfg_t here be removed?
+#if 0
 //! \name SysTick initialization arguments defination
 //! @{
 typedef enum {
@@ -65,7 +70,7 @@ typedef struct {
     uint32_t        reload_value;                   //!< Match value
 } systick_cfg_t;
 //! @}
-
+#endif
 /*============================ PROTOTYPES ====================================*/
 /*!\brief init SysTick Timer
  *! \param void
@@ -127,7 +132,7 @@ bool vsf_systick_init(systick_cfg_t *cfg_ptr)
     vsf_systick_set_reload(cfg_ptr->reload_value);
     vsf_systick_clear_count();
 
-    __SYSTICK_ATOM_CODE (
+    __SYSTICK_ATOM_CODE(
         s_wCSRBuffer = cfg_ptr->mode;
         SYSTICK_CSR = cfg_ptr->mode;
     )

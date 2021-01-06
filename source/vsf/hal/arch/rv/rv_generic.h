@@ -25,10 +25,17 @@
 #include "hal/driver/driver.h"
 #undef  __VSF_HEADER_ONLY_SHOW_ARCH_INFO__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*============================ MACROS ========================================*/
 
-#define __LITTLE_ENDIAN                 1
-#define __BYTE_ORDER                    __LITTLE_ENDIAN
+#ifndef __LITTLE_ENDIAN
+#   define __LITTLE_ENDIAN                 1
+#endif
+#ifndef __BYTE_ORDER
+#   define __BYTE_ORDER                    __LITTLE_ENDIAN
+#endif
 
 #ifndef VSF_ARCH_PRI_NUM
 #   define VSF_ARCH_PRI_NUM             128
@@ -41,7 +48,11 @@
 #define VSF_ARCH_SWI_NUM                1
 #define VSF_SYSTIMER_CFG_IMPL_MODE      VSF_SYSTIMER_IMPL_WITH_NORMAL_TIMER
 #define __VSF_ARCH_SYSTIMER_BITS        63
+
 /*============================ MACROFIED FUNCTIONS ===========================*/
+
+#define vsf_arch_wakeup()
+
 /*============================ TYPES =========================================*/
 
 typedef uint64_t vsf_systimer_cnt_t;
@@ -50,7 +61,7 @@ typedef uint64_t vsf_systimer_cnt_t;
             __vsf_arch_prio_index_##__N = (__N),
 
 enum {
-    MREPEAT(VSF_ARCH_PRI_NUM,__VSF_ARCH_PRI_INDEX, VSF_ARCH_PRI_BIT)
+    REPEAT_MACRO(VSF_ARCH_PRI_NUM,__VSF_ARCH_PRI_INDEX, VSF_ARCH_PRI_BIT)
 };
 
 #define __VSF_ARCH_PRI(__N, __BIT)                                              \
@@ -58,15 +69,20 @@ enum {
             vsf_arch_prio_##__N = (__N),
 
 enum vsf_arch_prio_t {
-    VSF_ARCH_PRIO_IVALID = -1,
-    vsf_arch_prio_ivalid = -1,
-    MREPEAT(VSF_ARCH_PRI_NUM, __VSF_ARCH_PRI, VSF_ARCH_PRI_BIT)
+    VSF_ARCH_PRIO_INVALID = -1,
+    vsf_arch_prio_invalid = -1,
+    REPEAT_MACRO(VSF_ARCH_PRI_NUM, __VSF_ARCH_PRI, VSF_ARCH_PRI_BIT)
+    vsf_arch_prio_highest = VSF_ARCH_PRI_NUM - 1,
 };
 typedef enum vsf_arch_prio_t vsf_arch_prio_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ PROTOTYPES ====================================*/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 /* EOF */

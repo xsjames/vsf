@@ -18,7 +18,6 @@
 /*============================ INCLUDES ======================================*/
 #include "hal/vsf_hal_cfg.h"
 #include "./device.h"
-#include "../../NuConsole/NuConsole.h"
 
 /*============================ MACROS ========================================*/
 
@@ -38,7 +37,7 @@
 /*============================ IMPLEMENTATION ================================*/
 
 // TODO: if these initialization is implemented in startup file, remove here
-char __low_level_init(void)
+int __low_level_init(void)
 {
     return 1;
 }
@@ -123,10 +122,6 @@ bool vsf_driver_init(void)
         }
         CLK->CLKDIV0 = (CLK->CLKDIV0 & ~CLK_CLKDIV0_PCLKDIV_Msk) | ((div - 1) << CLK_CLKDIV0_PCLKDIV_Pos);
     }
-
-#if VSF_HAL_CFG_SUPPORT_DEVICE_DEBUGGER_SERIAL_PORT == ENABLED
-    NuConsole_Init();
-#endif
 
     return true;
 }

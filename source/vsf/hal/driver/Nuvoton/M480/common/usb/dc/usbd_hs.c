@@ -117,6 +117,11 @@ static int_fast8_t m480_usbd_hs_get_free_idx(m480_usbd_hs_t *usbd_hs, uint_fast8
     return -1;
 }
 
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_suppress=pe111
+#endif
+
 vsf_err_t m480_usbd_hs_init(m480_usbd_hs_t *usbd_hs, usb_dc_cfg_t *cfg)
 {
     HSUSBD_T *reg = m480_usbd_hs_get_reg(usbd_hs);
@@ -174,6 +179,11 @@ vsf_err_t m480_usbd_hs_init(m480_usbd_hs_t *usbd_hs, usb_dc_cfg_t *cfg)
     }
     return VSF_ERR_NONE;
 }
+
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_warning=pe111
+#endif
 
 void m480_usbd_hs_fini(m480_usbd_hs_t *usbd_hs)
 {
@@ -265,10 +275,31 @@ void m480_usbd_hs_status_stage(m480_usbd_hs_t *usbd_hs, bool is_in)
     reg->CEPCTL = USB_CEPCTL_NAKCLR;
 }
 
-uint_fast8_t m480_usbd_hs_ep_get_feature(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep)
+uint_fast8_t m480_usbd_hs_ep_get_feature(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep, uint_fast8_t feature)
 {
-    return 0;
+/*    HSUSBD_T *reg = m480_usbd_hs_get_reg(usbd_hs);
+    if (    (feature & USB_DC_FEATURE_TRANSFER)
+        &&  !(reg->DMACTL & HSUSBD_DMACTL_DMAEN_Msk)) {
+
+        int_fast8_t idx;
+
+        reg = m480_usbd_hs_get_reg(usbd_hs);
+        idx = m480_usbd_hs_get_idx(usbd_hs, ep);
+        VSF_HAL_ASSERT(idx >= 2);
+        idx -= 2;
+
+        if ((M480_USBD_EP_REG(idx, EP[0].EPRSPCTL) & USB_EP_RSPCTL_MODE_MASK) != USB_EP_RSPCTL_MODE_AUTO) {
+            M480_USBD_EP_REG(idx, EP[0].EPRSPCTL) = USB_EP_RSPCTL_MODE_AUTO;
+        }
+        return USB_DC_FEATURE_TRANSFER;
+    }
+*/    return 0;
 }
+
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_suppress=pe111
+#endif
 
 vsf_err_t m480_usbd_hs_ep_add(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep, usb_ep_type_t type, uint_fast16_t size)
 {
@@ -316,11 +347,14 @@ uint_fast16_t m480_usbd_hs_ep_get_size(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep)
     int_fast8_t idx = m480_usbd_hs_get_idx(usbd_hs, ep);
 
     if (idx < 0) {
+        VSF_HAL_ASSERT(false);
         return 0;
     }
 
     if (idx <= 1) {
-        return reg->CEPBUFEND - reg->CEPBUFST + 1;
+        // make compiler happy
+        uint_fast16_t tmp = reg->CEPBUFEND;
+        return tmp - reg->CEPBUFST + 1;
     } else {
         idx -= 2;
         return M480_USBD_EP_REG(idx, EP[0].EPMPS);
@@ -333,6 +367,7 @@ vsf_err_t m480_usbd_hs_ep_set_stall(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep)
     int_fast8_t idx = m480_usbd_hs_get_idx(usbd_hs, ep);
 
     if (idx < 0) {
+        VSF_HAL_ASSERT(false);
         return VSF_ERR_FAIL;
     }
 
@@ -354,6 +389,7 @@ bool m480_usbd_hs_ep_is_stalled(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep)
     int_fast8_t idx = m480_usbd_hs_get_idx(usbd_hs, ep);
 
     if (idx < 0) {
+        VSF_HAL_ASSERT(false);
         return true;
     }
 
@@ -371,6 +407,7 @@ vsf_err_t m480_usbd_hs_ep_clear_stall(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep)
     int_fast8_t idx = m480_usbd_hs_get_idx(usbd_hs, ep);
 
     if (idx < 0) {
+        VSF_HAL_ASSERT(false);
         return VSF_ERR_FAIL;
     }
 
@@ -387,16 +424,12 @@ vsf_err_t m480_usbd_hs_ep_clear_stall(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep)
 
 uint_fast32_t m480_usbd_hs_ep_get_data_size(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep)
 {
-    HSUSBD_T *reg;
-    int_fast8_t idx;
+    VSF_HAL_ASSERT(!(ep & 0x80));
+    HSUSBD_T *reg = m480_usbd_hs_get_reg(usbd_hs);
+    int_fast8_t idx = m480_usbd_hs_get_idx(usbd_hs, ep);
 
-    if (ep & 0x80) {
-        return 0;
-    }
-
-    reg = m480_usbd_hs_get_reg(usbd_hs);
-    idx = m480_usbd_hs_get_idx(usbd_hs, ep);
     if (idx < 0) {
+        VSF_HAL_ASSERT(false);
         return 0;
     }
 
@@ -410,16 +443,12 @@ uint_fast32_t m480_usbd_hs_ep_get_data_size(m480_usbd_hs_t *usbd_hs, uint_fast8_
 
 vsf_err_t m480_usbd_hs_ep_transaction_read_buffer(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep, uint8_t *buffer, uint_fast16_t size)
 {
-    HSUSBD_T *reg;
-    int_fast8_t idx;
+    VSF_HAL_ASSERT(!(ep & 0x80) && (size <= m480_usbd_hs_ep_get_data_size(usbd_hs, ep)));
+    HSUSBD_T *reg = m480_usbd_hs_get_reg(usbd_hs);
+    int_fast8_t idx = m480_usbd_hs_get_idx(usbd_hs, ep);
 
-    if ((ep & 0x80) || (size > m480_usbd_hs_ep_get_data_size(usbd_hs, ep))) {
-        return VSF_ERR_BUG;
-    }
-
-    reg = m480_usbd_hs_get_reg(usbd_hs);
-    idx = m480_usbd_hs_get_idx(usbd_hs, ep);
     if (idx < 0) {
+        VSF_HAL_ASSERT(false);
         return VSF_ERR_FAIL;
     }
 
@@ -448,16 +477,12 @@ vsf_err_t m480_usbd_hs_ep_transaction_read_buffer(m480_usbd_hs_t *usbd_hs, uint_
 
 vsf_err_t m480_usbd_hs_ep_transaction_enable_out(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep)
 {
-    HSUSBD_T *reg;
-    int_fast8_t idx;
+    VSF_HAL_ASSERT(!(ep & 0x80));
+    HSUSBD_T *reg = m480_usbd_hs_get_reg(usbd_hs);
+    int_fast8_t idx = m480_usbd_hs_get_idx(usbd_hs, ep);
 
-    if (ep & 0x80) {
-        return VSF_ERR_BUG;
-    }
-
-    reg = m480_usbd_hs_get_reg(usbd_hs);
-    idx = m480_usbd_hs_get_idx(usbd_hs, ep);
     if (idx < 0) {
+        VSF_HAL_ASSERT(false);
         return VSF_ERR_FAIL;
     }
 
@@ -471,16 +496,12 @@ vsf_err_t m480_usbd_hs_ep_transaction_enable_out(m480_usbd_hs_t *usbd_hs, uint_f
 
 vsf_err_t m480_usbd_hs_ep_transaction_set_data_size(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep, uint_fast16_t size)
 {
-    HSUSBD_T *reg;
-    int_fast8_t idx;
+    VSF_HAL_ASSERT(ep & 0x80);
+    HSUSBD_T *reg = m480_usbd_hs_get_reg(usbd_hs);
+    int_fast8_t idx = m480_usbd_hs_get_idx(usbd_hs, ep);
 
-    if (!(ep & 0x80)) {
-        return VSF_ERR_BUG;
-    }
-
-    reg = m480_usbd_hs_get_reg(usbd_hs);
-    idx = m480_usbd_hs_get_idx(usbd_hs, ep);
     if (idx < 0) {
+        VSF_HAL_ASSERT(false);
         return VSF_ERR_FAIL;
     }
 
@@ -513,16 +534,12 @@ vsf_err_t m480_usbd_hs_ep_transaction_set_data_size(m480_usbd_hs_t *usbd_hs, uin
 
 vsf_err_t m480_usbd_hs_ep_transaction_write_buffer(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep, uint8_t *buffer, uint_fast16_t size)
 {
-    HSUSBD_T *reg;
-    int_fast8_t idx;
+    VSF_HAL_ASSERT(ep & 0x80);
+    HSUSBD_T *reg = m480_usbd_hs_get_reg(usbd_hs);
+    int_fast8_t idx = m480_usbd_hs_get_idx(usbd_hs, ep);
 
-    if (!(ep & 0x80)) {
-        return VSF_ERR_BUG;
-    }
-
-    reg = m480_usbd_hs_get_reg(usbd_hs);
-    idx = m480_usbd_hs_get_idx(usbd_hs, ep);
     if (idx < 0) {
+        VSF_HAL_ASSERT(false);
         return VSF_ERR_FAIL;
     }
 
@@ -561,16 +578,35 @@ vsf_err_t m480_usbd_hs_ep_transaction_write_buffer(m480_usbd_hs_t *usbd_hs, uint
     return VSF_ERR_NONE;
 }
 
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_warning=pe111
+#endif
+
 vsf_err_t m480_usbd_hs_ep_transfer_recv(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep, uint8_t *buffer, uint_fast32_t size)
 {
-    VSF_HAL_ASSERT(false);
-    return VSF_ERR_NOT_SUPPORT;
+    VSF_HAL_ASSERT(!(ep & 0x80) && !(size & ~HSUSBD_DMACNT_DMACNT_Msk));
+    HSUSBD_T *reg = m480_usbd_hs_get_reg(usbd_hs);
+
+    reg->BUSINTEN |= HSUSBD_BUSINTEN_DMADONEIEN_Msk;
+    reg->DMACTL = (reg->DMACTL & ~(HSUSBD_DMACTL_EPNUM_Msk | HSUSBD_DMACTL_DMARD_Msk | HSUSBD_DMACTL_SVINEP_Msk)) | (ep & 0x0F);
+    reg->DMAADDR = (uint32_t)buffer;
+    reg->DMACNT = size;
+    reg->DMACTL |= HSUSBD_DMACTL_DMAEN_Msk;
+    return VSF_ERR_NONE;
 }
 
 vsf_err_t m480_usbd_hs_ep_transfer_send(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep, uint8_t *buffer, uint_fast32_t size, bool zlp)
 {
-    VSF_HAL_ASSERT(false);
-    return VSF_ERR_NOT_SUPPORT;
+    VSF_HAL_ASSERT((ep & 0x80) && !(size & ~HSUSBD_DMACNT_DMACNT_Msk));
+    HSUSBD_T *reg = m480_usbd_hs_get_reg(usbd_hs);
+
+    reg->BUSINTEN |= HSUSBD_BUSINTEN_DMADONEIEN_Msk;
+    reg->DMACTL = (reg->DMACTL & ~HSUSBD_DMACTL_EPNUM_Msk) | HSUSBD_DMACTL_DMARD_Msk | HSUSBD_DMACTL_SVINEP_Msk | (ep & 0x0F);
+    reg->DMAADDR = (uint32_t)buffer;
+    reg->DMACNT = size;
+    reg->DMACTL |= HSUSBD_DMACTL_DMAEN_Msk;
+    return VSF_ERR_NONE;
 }
 
 static void m480_usbd_hs_notify(m480_usbd_hs_t *usbd_hs, usb_evt_t evt, uint_fast8_t value)
@@ -603,6 +639,12 @@ void m480_usbd_hs_irq(m480_usbd_hs_t *usbd_hs)
         }
         if (status & HSUSBD_BUSINTSTS_RSTIF_Msk) {
             status &= ~HSUSBD_BUSINTSTS_RSTIF_Msk;
+
+            // reset dma
+            reg->DMACNT = 0;
+            reg->DMACTL = HSUSBD_DMACTL_DMARST_Msk;
+            reg->DMACTL = 0;
+
             m480_usbd_hs_notify(usbd_hs, USB_ON_RESET, 0);
             reg->BUSINTSTS = HSUSBD_BUSINTSTS_RSTIF_Msk;
             reg->CEPINTSTS = 0x1ffc;
@@ -610,10 +652,21 @@ void m480_usbd_hs_irq(m480_usbd_hs_t *usbd_hs)
         if (status & HSUSBD_BUSINTSTS_RESUMEIF_Msk) {
             status &= ~HSUSBD_BUSINTSTS_RESUMEIF_Msk;
             m480_usbd_hs_notify(usbd_hs, USB_ON_RESUME, 0);
+            reg->BUSINTSTS = HSUSBD_BUSINTSTS_RESUMEIF_Msk;
         }
         if (status & HSUSBD_BUSINTSTS_SUSPENDIF_Msk) {
             status &= ~HSUSBD_BUSINTSTS_SUSPENDIF_Msk;
             m480_usbd_hs_notify(usbd_hs, USB_ON_SUSPEND, 0);
+            reg->BUSINTSTS = HSUSBD_BUSINTSTS_SUSPENDIF_Msk;
+        }
+        if (status & HSUSBD_BUSINTSTS_DMADONEIF_Msk) {
+            uint_fast8_t ep = (reg->DMACTL & HSUSBD_DMACTL_EPNUM_Msk) >> HSUSBD_DMACTL_EPNUM_Pos;
+            if (reg->DMACTL & HSUSBD_DMACTL_SVINEP_Msk) {
+                m480_usbd_hs_notify(usbd_hs, USB_ON_IN, ep);
+            } else {
+                m480_usbd_hs_notify(usbd_hs, USB_ON_OUT, ep);
+            }
+            reg->BUSINTSTS = HSUSBD_BUSINTSTS_DMADONEIF_Msk;
         }
         if (status) {
             reg->BUSINTSTS = status;

@@ -15,13 +15,10 @@
  *                                                                           *
  ****************************************************************************/
 
-#ifndef __USE_ARM_COMPILER_H__
-#define __USE_ARM_COMPILER_H__
+#ifndef __USE_MCS51_COMPILER_H_PART_1__
+#define __USE_MCS51_COMPILER_H_PART_1__
 
 /*============================ INCLUDES ======================================*/
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
 
 //! \name The macros to identify the compiler
 //! @{
@@ -35,7 +32,7 @@
 #endif
 
 
-//! \note for arm compiler 5
+//! \note for KEIL51
 #ifdef __IS_COMPILER_51_KEIL__
 #   undef __IS_COMPILER_51_KEIL__
 #endif
@@ -44,14 +41,28 @@
 #endif
 //! @}
 
+#endif /* __USE_MCS51_COMPILER_H_PART_1__ */
+
+
+/*========================== Multiple-Entry Start ============================*/
 
 #if __IS_COMPILER_IAR__
 #   include <intrinsics.h>
 #endif
 
-
 #include "./type.h"
 #include "../__common/__compiler.h"
+
+/*========================== Multiple-Entry End ==============================*/
+
+
+#ifndef __USE_MCS51_COMPILER_H_PART_2__
+#define __USE_MCS51_COMPILER_H_PART_2__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* -----------------  Start of section using anonymous unions  -------------- */
 #if __IS_COMPILER_51_KEIL__
   //#pragma push
@@ -66,6 +77,7 @@
 
 //! \brief none standard memory types
 #if __IS_COMPILER_IAR__
+#   define LOW_LEVEL_INIT_RET_T char
 #   define ROM_FLASH            _Pragma(__STR(location=".rom.flash")) const
 #   define ROM_EEPROM           _Pragma(__STR(location=".rom.eeprom")) const
 #   define NO_INIT              __no_init
@@ -178,12 +190,16 @@ typedef uint8_t   vsf_gint_state_t;
 
 
 /*============================ TYPES =========================================*/
-/*============================ INCLUDES ======================================*/
-
-//! \brief for interrupt 
-#include "./signal.h"
-
 /*============================ PROTOTYPES ====================================*/
 extern void vsf_stdio_init(void);
 
+#ifdef __cplusplus
+}
 #endif
+
+/*============================ INCLUDES ======================================*/
+
+#include "./msc51_interrupt.h"
+
+#endif /* __USE_MCS51_COMPILER_H_PART_2__ */
+

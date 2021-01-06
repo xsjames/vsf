@@ -23,18 +23,49 @@
 
 #include "./vsf_input.h"
 #include "kernel/vsf_kernel.h"
+#include "utilities/vsf_utilities.h"
 
 /*============================ MACROS ========================================*/
+
+#ifndef VSF_INPUT_CFG_PROTECT_LEVEL
+/*! \note   By default, the driver tries to make all APIs interrupt-safe,
+ *!
+ *!         in the case when you want to disable it,
+ *!         please use following macro:
+ *!         #define VSF_INPUT_CFG_PROTECT_LEVEL  none
+ *!         
+ *!         in the case when you want to use scheduler-safe,
+ *!         please use following macro:
+ *!         #define VSF_INPUT_CFG_PROTECT_LEVEL  scheduler
+ *!         
+ *!         NOTE: This macro should be defined in vsf_usr_cfg.h
+ */
+#   define VSF_INPUT_CFG_PROTECT_LEVEL      interrupt
+#endif
+
+#define vsf_input_protect                   vsf_protect(VSF_INPUT_CFG_PROTECT_LEVEL)
+#define vsf_input_unprotect                 vsf_unprotect(VSF_INPUT_CFG_PROTECT_LEVEL)
+
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
+
+#if VSF_INPUT_CFG_REGISTRATION_MECHANISM == ENABLED
+typedef struct vsf_input_t {
+    vsf_slist_t notifier_list;
+} vsf_input_t;
+#endif
+
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ LOCAL VARIABLES ===============================*/
+
+#if VSF_INPUT_CFG_REGISTRATION_MECHANISM == ENABLED
+static vsf_input_t __vsf_input;
+#endif
+
 /*============================ PROTOTYPES ====================================*/
 
-#if     defined(WEAK_VSF_INPUT_ON_EVT_EXTERN)                                   \
-    &&  defined(WEAK_VSF_INPUT_ON_EVT)
-WEAK_VSF_INPUT_ON_EVT_EXTERN
-#endif
+extern void vsf_input_on_evt(vk_input_type_t type, vk_input_evt_t *evt);
+extern void vsf_input_on_mouse(vk_mouse_evt_t *mouse_evt);
 
 /*============================ IMPLEMENTATION ================================*/
 
@@ -132,11 +163,7 @@ vk_input_item_info_t * vk_input_parse(vk_input_parser_t *parser, uint8_t *pre, u
 WEAK(vsf_input_on_sensor)
 void vsf_input_on_sensor(vk_sensor_evt_t *sensor_evt)
 {
-#ifndef WEAK_VSF_INPUT_ON_EVT
     vsf_input_on_evt(VSF_INPUT_TYPE_SENSOR, &sensor_evt->use_as__vk_input_evt_t);
-#else
-    WEAK_VSF_INPUT_ON_EVT(VSF_INPUT_TYPE_SENSOR, &sensor_evt->use_as__vk_input_evt_t);
-#endif
 }
 #endif
 
@@ -144,11 +171,17 @@ void vsf_input_on_sensor(vk_sensor_evt_t *sensor_evt)
 WEAK(vsf_input_on_touchscreen)
 void vsf_input_on_touchscreen(vk_touchscreen_evt_t *ts_evt)
 {
-#ifndef WEAK_VSF_INPUT_ON_EVT
-    vsf_input_on_evt(VSF_INPUT_TYPE_TOUCHSCREEN, &ts_evt->use_as__vk_input_evt_t);
-#else
-    WEAK_VSF_INPUT_ON_EVT(VSF_INPUT_TYPE_TOUCHSCREEN, &ts_evt->use_as__vk_input_evt_t);
+#if VSF_TOUCH_SCREEN_CFG_TRACE == ENABLED
+    if (vsf_input_touchscreen_is_down(ts_evt)) {
+        vsf_trace_debug("touch_screen(%d): (%d, %d) %d\n",
+            vsf_input_touchscreen_get_id(ts_evt), vsf_input_touchscreen_get_x(ts_evt),
+            vsf_input_touchscreen_get_y(ts_evt), vsf_input_touchscreen_get_pressure(ts_evt));
+    } else {
+        vsf_trace_debug("touch_screen(%d): (-1, -1) 0\n",
+            vsf_input_touchscreen_get_id(ts_evt));
+    }
 #endif
+    vsf_input_on_evt(VSF_INPUT_TYPE_TOUCHSCREEN, &ts_evt->use_as__vk_input_evt_t);
 }
 #endif
 
@@ -156,11 +189,15 @@ void vsf_input_on_touchscreen(vk_touchscreen_evt_t *ts_evt)
 WEAK(vsf_input_on_gamepad)
 void vsf_input_on_gamepad(vk_gamepad_evt_t *gamepad_evt)
 {
-#ifndef WEAK_VSF_INPUT_ON_EVT
     vsf_input_on_evt(VSF_INPUT_TYPE_GAMEPAD, &gamepad_evt->use_as__vk_input_evt_t);
-#else
-    WEAK_VSF_INPUT_ON_EVT(VSF_INPUT_TYPE_GAMEPAD, &gamepad_evt->use_as__vk_input_evt_t);
+}
 #endif
+
+#ifndef WEAK_VSF_INPUT_ON_MOUSE
+WEAK(vsf_input_on_mouse)
+void vsf_input_on_mouse(vk_mouse_evt_t *mouse_evt)
+{
+    vsf_input_on_evt(VSF_INPUT_TYPE_MOUSE, &mouse_evt->use_as__vk_input_evt_t);
 }
 #endif
 
@@ -168,11 +205,7 @@ void vsf_input_on_gamepad(vk_gamepad_evt_t *gamepad_evt)
 WEAK(vsf_input_on_keyboard)
 void vsf_input_on_keyboard(vk_keyboard_evt_t *keyboard_evt)
 {
-#ifndef WEAK_VSF_INPUT_ON_EVT
     vsf_input_on_evt(VSF_INPUT_TYPE_KEYBOARD, &keyboard_evt->use_as__vk_input_evt_t);
-#else
-    WEAK_VSF_INPUT_ON_EVT(VSF_INPUT_TYPE_KEYBOARD, &keyboard_evt->use_as__vk_input_evt_t);
-#endif
 }
 #endif
 
@@ -194,15 +227,47 @@ void vsf_input_on_free_dev(vk_input_type_t type, void *dev)
 WEAK(vsf_input_on_evt)
 void vsf_input_on_evt(vk_input_type_t type, vk_input_evt_t *evt)
 {
+#if VSF_INPUT_CFG_REGISTRATION_MECHANISM == ENABLED
+    vsf_protect_t orig = vsf_input_protect();
+        __vsf_slist_foreach_unsafe(vk_input_notifier_t, notifier_node, &__vsf_input.notifier_list) {
+            if (_->mask & (1 << type)) {
+                VSF_INPUT_ASSERT(_->on_evt != NULL);
+                _->on_evt(type, evt);
+            }
+        }
+    vsf_input_unprotect(orig);
+#endif
 }
 #endif
 
 uint_fast32_t vk_input_update_timestamp(vk_input_timestamp_t *timestamp)
 {
-    vk_input_timestamp_t cur = vsf_timer_get_tick();
+#if VSF_KERNEL_CFG_EDA_SUPPORT_TIMER == ENABLED
+    vk_input_timestamp_t cur = vsf_systimer_get_tick();
     uint_fast32_t duration = *timestamp > 0 ? vsf_timer_get_duration(*timestamp, cur) : 0;
     *timestamp = cur;
     return duration;
+#else
+    return 0;
+#endif
 }
+
+#if VSF_INPUT_CFG_REGISTRATION_MECHANISM == ENABLED
+void vk_input_notifier_register(vk_input_notifier_t *notifier)
+{
+    vsf_protect_t orig = vsf_input_protect();
+        VSF_INPUT_ASSERT(!vsf_slist_is_in(vk_input_notifier_t, notifier_node, &__vsf_input.notifier_list, notifier));
+        vsf_slist_add_to_head(vk_input_notifier_t, notifier_node, &__vsf_input.notifier_list, notifier);
+    vsf_input_unprotect(orig);
+}
+
+void vk_input_notifier_unregister(vk_input_notifier_t *notifier)
+{
+    vsf_protect_t orig = vsf_input_protect();
+        VSF_INPUT_ASSERT(vsf_slist_is_in(vk_input_notifier_t, notifier_node, &__vsf_input.notifier_list, notifier));
+        vsf_slist_remove(vk_input_notifier_t, notifier_node, &__vsf_input.notifier_list, notifier);
+    vsf_input_unprotect(orig);
+}
+#endif
 
 #endif      // VSF_USE_INPUT

@@ -19,17 +19,42 @@
 
 #include "../../vsf_linux_cfg.h"
 
-#if VSF_USE_LINUX == ENABLED && VSF_USE_LINUX_LIBUSB == ENABLED
+#if VSF_USE_LINUX == ENABLED && VSF_LINUX_USE_LIBUSB == ENABLED
 
-#define VSF_USBH_IMPLEMENT
-#define VSF_LINUX_INHERIT
-#include "../../vsf_linux.h"
+#define __VSF_EDA_CLASS_INHERIT__
+#define __VSF_LINUX_CLASS_INHERIT__
 
-#include <libusb.h>
+// libusb is another upper layer for usb host, so it need to access some private members
+// for vk_usbh_get_pipe and urb private members
+#define __VSF_USBH_CLASS_IMPLEMENT
 
-#include <poll.h>
-#include <pthread.h>
-#include <sys/time.h>
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED
+#   include "../../include/unistd.h"
+#   include "../../include/libusb.h"
+
+#   include "../../include/poll.h"
+#   include "../../include/pthread.h"
+#   include "../../include/sys/time.h"
+#else
+#   include <unistd.h>
+#   include <libusb.h>
+
+#   include <poll.h>
+#   include <pthread.h>
+#   include <sys/time.h>
+#endif
+
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED && VSF_LINUX_USE_SIMPLE_STDLIB == ENABLED
+#   include "../../include/simple_libc/stdlib.h"
+#else
+#   include <stdlib.h>
+#endif
+
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED && VSF_LINUX_USE_SIMPLE_STRING == ENABLED
+#   include "../../include/simple_libc/string.h"
+#else
+#   include <string.h>
+#endif
 
 /*============================ MACROS ========================================*/
 
@@ -40,7 +65,7 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct vsf_linux_libusb_cb_t {
+typedef struct vsf_linux_libusb_cb_t {
     vsf_dlist_node_t cbnode;
 
     libusb_hotplug_callback_handle handle;
@@ -54,19 +79,17 @@ struct vsf_linux_libusb_cb_t {
     int dev_class;
 
     void *user_data;
-};
-typedef struct vsf_linux_libusb_cb_t vsf_linux_libusb_cb_t;
+} vsf_linux_libusb_cb_t;
 
-struct vsf_linux_libusb_transfer_t {
+typedef struct vsf_linux_libusb_transfer_t {
     vk_usbh_urb_t urb;
     vsf_dlist_node_t transnode;
     vsf_eda_t eda;
     // transfer MUST be the last for variable number of iso_packet_desc
     struct libusb_transfer transfer;
-};
-typedef struct vsf_linux_libusb_transfer_t vsf_linux_libusb_transfer_t;
+} vsf_linux_libusb_transfer_t;
 
-struct vsf_linux_libusb_dev_t {
+typedef struct vsf_linux_libusb_dev_t {
     vsf_dlist_node_t devnode;
     vk_usbh_libusb_dev_t *libusb_dev;
     bool is_in_newlist;
@@ -77,10 +100,9 @@ struct vsf_linux_libusb_dev_t {
         };
         vk_usbh_pipe_t pipe[32];
     };
-};
-typedef struct vsf_linux_libusb_dev_t vsf_linux_libusb_dev_t;
+} vsf_linux_libusb_dev_t;
 
-struct vsf_linux_libusb_t {
+typedef struct vsf_linux_libusb_t {
     libusb_hotplug_callback_handle cbhandle;
     vsf_dlist_t cblist;
 
@@ -98,8 +120,7 @@ struct vsf_linux_libusb_t {
 
     int fd;
     struct libusb_pollfd pollfd[1];
-};
-typedef struct vsf_linux_libusb_t vsf_linux_libusb_t;
+} vsf_linux_libusb_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ LOCAL VARIABLES ===============================*/
@@ -107,10 +128,6 @@ typedef struct vsf_linux_libusb_t vsf_linux_libusb_t;
 static vsf_linux_libusb_t __vsf_libusb = { 0 };
 
 /*============================ PROTOTYPES ====================================*/
-
-SECTION(".text.vsf.kernel.eda")
-extern vsf_err_t __vsf_eda_fini(vsf_eda_t *pthis);
-
 /*============================ IMPLEMENTATION ================================*/
 
 static void __vsf_linux_libusb_on_event(void *param, vk_usbh_libusb_dev_t *dev, vk_usbh_libusb_evt_t evt)
@@ -154,7 +171,7 @@ static void __vsf_linux_libusb_process_cb(vsf_linux_libusb_dev_t *ldev, vk_usbh_
     __vsf_dlist_foreach_unsafe(vsf_linux_libusb_cb_t, cbnode, &__vsf_libusb.cblist) {
         if (    ((_->vendor_id == LIBUSB_HOTPLUG_MATCH_ANY) || (_->vendor_id == ldev->libusb_dev->vid))
             &&  ((_->product_id == LIBUSB_HOTPLUG_MATCH_ANY) || (_->product_id == ldev->libusb_dev->pid))
-            &&  ((_->dev_class == LIBUSB_HOTPLUG_MATCH_ANY) || (_->dev_class == ldev->libusb_dev->class))
+            &&  ((_->dev_class == LIBUSB_HOTPLUG_MATCH_ANY) || (_->dev_class == ldev->libusb_dev->c))
             &&  (_->cb_fn != NULL)) {
 
             switch (evt) {
@@ -202,12 +219,12 @@ static void * __vsf_libusb_libusb_core_thread(void *param)
             __vsf_linux_libusb_process_cb(ldev, VSF_USBH_LIBUSB_EVT_ON_ARRIVED);
         }
     }
+    return NULL;
 }
 
 static void * __vsf_libusb_libusb_user_thread(void *param)
 {
     vsf_linux_libusb_transfer_t *ltransfer;
-    vsf_linux_libusb_dev_t *ldev;
 //    vsf_protect_t orig;
 
     while (1) {
@@ -235,6 +252,7 @@ static void * __vsf_libusb_libusb_user_thread(void *param)
             pthread_exit(0);
         }
     }
+    return NULL;
 }
 
 void vsf_linux_libusb_startup(void)
@@ -269,7 +287,6 @@ int libusb_init(libusb_context **context)
 
 void libusb_exit(struct libusb_context *ctx)
 {
-    vsf_linux_thread_t *thread = vsf_linux_get_cur_thread();
     if (__vsf_libusb.fd >= 0) {
         __vsf_libusb.is_to_exit = true;
         vsf_eda_trig_set(&__vsf_libusb.trans_trig);
@@ -282,11 +299,21 @@ void libusb_exit(struct libusb_context *ctx)
     }
 }
 
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_suppress=pe111
+#endif
+
 int libusb_get_next_timeout(libusb_context *ctx, struct timeval *tv)
 {
     VSF_LINUX_ASSERT(false);
     return 0;
 }
+
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_warning=pe111
+#endif
 
 int libusb_has_capability(uint32_t capability)
 {
@@ -390,7 +417,7 @@ int libusb_open(libusb_device *dev, libusb_device_handle **dev_handle)
 
 void libusb_close(libusb_device_handle *dev_handle)
 {
-    
+
 }
 
 int libusb_attach_kernel_driver(libusb_device_handle *dev_handle, int interface_number)
@@ -413,7 +440,7 @@ uint8_t libusb_get_bus_number(libusb_device *dev)
     return 0;
 }
 
-libusb_device *libusb_ref_device(libusb_device *dev)
+libusb_device * libusb_ref_device(libusb_device *dev)
 {
     return dev;
 }
@@ -428,7 +455,7 @@ uint8_t libusb_get_device_address(libusb_device *dev)
     return ldev->libusb_dev->address;
 }
 
-static vk_usbh_pipe_t * __vsf_linux_libusb_get_pipe(vsf_linux_libusb_dev_t *ldev, unsigned char endpoint)
+static vk_usbh_pipe_t * __vsf_libusb_get_pipe(vsf_linux_libusb_dev_t *ldev, unsigned char endpoint)
 {
     unsigned char epaddr = endpoint & 0x7F;
     return ((endpoint & USB_DIR_MASK) == USB_DIR_IN) ? &ldev->pipe_in[epaddr] : &ldev->pipe_out[epaddr];
@@ -437,7 +464,7 @@ static vk_usbh_pipe_t * __vsf_linux_libusb_get_pipe(vsf_linux_libusb_dev_t *ldev
 int libusb_get_max_packet_size(libusb_device *dev, unsigned char endpoint)
 {
     vsf_linux_libusb_dev_t *ldev = (vsf_linux_libusb_dev_t *)dev;
-    vk_usbh_pipe_t *pipe = __vsf_linux_libusb_get_pipe(ldev, endpoint);
+    vk_usbh_pipe_t *pipe = __vsf_libusb_get_pipe(ldev, endpoint);
     return pipe->size;
 }
 
@@ -447,9 +474,8 @@ int libusb_get_device_speed(libusb_device *dev)
     return ldev->libusb_dev->dev->speed;
 }
 
-static int __vsf_linux_libusb_submit_urb(vsf_linux_libusb_dev_t *ldev)
+static int __vsf_libusb_submit_urb(vsf_linux_libusb_dev_t *ldev)
 {
-    vsf_linux_thread_t *thread = vsf_linux_get_cur_thread();
     vk_usbh_urb_t *urb = &ldev->libusb_dev->urb;
 
     if (VSF_ERR_NONE != vk_usbh_submit_urb(ldev->libusb_dev->usbh, urb)) {
@@ -459,7 +485,12 @@ static int __vsf_linux_libusb_submit_urb(vsf_linux_libusb_dev_t *ldev)
     return URB_OK != vk_usbh_urb_get_status(urb) ? LIBUSB_ERROR_IO : LIBUSB_SUCCESS;
 }
 
-static vk_usbh_urb_t * __vsf_linux_libusb_get_urb(vsf_linux_libusb_dev_t *ldev)
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_suppress=pe111
+#endif
+
+static vk_usbh_urb_t * __vsf_libusb_get_urb(vsf_linux_libusb_dev_t *ldev)
 {
     vk_usbh_urb_t *urb = &ldev->libusb_dev->urb;
     if (!vk_usbh_urb_is_alloced(urb)) {
@@ -471,12 +502,17 @@ static vk_usbh_urb_t * __vsf_linux_libusb_get_urb(vsf_linux_libusb_dev_t *ldev)
     return urb;
 }
 
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_warning=pe111
+#endif
+
 int libusb_control_transfer(libusb_device_handle *dev_handle,
     uint8_t bRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex,
     unsigned char *data, uint16_t wLength, unsigned int timeout)
 {
     vsf_linux_libusb_dev_t *ldev = (vsf_linux_libusb_dev_t *)dev_handle;
-    vk_usbh_urb_t *urb = __vsf_linux_libusb_get_urb(ldev);
+    vk_usbh_urb_t *urb = __vsf_libusb_get_urb(ldev);
     int err;
 
     if ((bRequestType & USB_DIR_MASK) == USB_DIR_IN) {
@@ -492,7 +528,7 @@ int libusb_control_transfer(libusb_device_handle *dev_handle,
     urb->urb_hcd->buffer = data;
     urb->urb_hcd->transfer_length = wLength;
     urb->urb_hcd->timeout = timeout;
-    err = __vsf_linux_libusb_submit_urb(ldev);
+    err = __vsf_libusb_submit_urb(ldev);
     if (!err) { err = vk_usbh_urb_get_actual_length(urb); }
     return err;
 }
@@ -502,7 +538,7 @@ int libusb_bulk_transfer(libusb_device_handle *dev_handle,
     int *actual_length, unsigned int timeout)
 {
     vsf_linux_libusb_dev_t *ldev = (vsf_linux_libusb_dev_t *)dev_handle;
-    vk_usbh_pipe_t *pipe = __vsf_linux_libusb_get_pipe(ldev, endpoint);
+    vk_usbh_pipe_t *pipe = __vsf_libusb_get_pipe(ldev, endpoint);
     vk_usbh_urb_t *urb = &ldev->libusb_dev->urb;
     int ret;
 
@@ -511,7 +547,7 @@ int libusb_bulk_transfer(libusb_device_handle *dev_handle,
     urb->urb_hcd->transfer_length = length;
     urb->urb_hcd->timeout = timeout;
 
-    ret = __vsf_linux_libusb_submit_urb(ldev);
+    ret = __vsf_libusb_submit_urb(ldev);
     *pipe = urb->urb_hcd->pipe;
     if (!ret && (actual_length != NULL)) {
         *actual_length = vk_usbh_urb_get_actual_length(urb);
@@ -524,7 +560,7 @@ int libusb_interrupt_transfer(libusb_device_handle *dev_handle,
     int *actual_length, unsigned int timeout)
 {
     vsf_linux_libusb_dev_t *ldev = (vsf_linux_libusb_dev_t *)dev_handle;
-    vk_usbh_pipe_t *pipe = __vsf_linux_libusb_get_pipe(ldev, endpoint);
+    vk_usbh_pipe_t *pipe = __vsf_libusb_get_pipe(ldev, endpoint);
     vk_usbh_urb_t *urb = &ldev->libusb_dev->urb;
     int ret;
 
@@ -533,7 +569,7 @@ int libusb_interrupt_transfer(libusb_device_handle *dev_handle,
     urb->urb_hcd->transfer_length = length;
     urb->urb_hcd->timeout = timeout;
 
-    ret = __vsf_linux_libusb_submit_urb(ldev);
+    ret = __vsf_libusb_submit_urb(ldev);
     *pipe = urb->urb_hcd->pipe;
     if (!ret && (actual_length != NULL))
         *actual_length = vk_usbh_urb_get_actual_length(urb);
@@ -643,7 +679,7 @@ int libusb_get_string_descriptor(libusb_device_handle *dev_handle,
         langid, data, (uint16_t) length, 1000);
 }
 
-static int raw_desc_to_config(vsf_linux_libusb_dev_t *ldev, unsigned char *buf, struct libusb_config_descriptor **config)
+static int __raw_desc_to_config(vsf_linux_libusb_dev_t *ldev, unsigned char *buf, struct libusb_config_descriptor **config)
 {
     struct usb_config_desc_t *desc_config = (struct usb_config_desc_t *)buf;
     struct usb_interface_desc_t *desc_ifs;
@@ -656,7 +692,7 @@ static int raw_desc_to_config(vsf_linux_libusb_dev_t *ldev, unsigned char *buf, 
     struct libusb_endpoint_descriptor *endpoint_desc;
 
     uint_fast16_t size = desc_config->wTotalLength, len, tmpsize;
-    uint_fast8_t ifs_no, alt_num, ep_num, reach_endpoint;
+    uint_fast8_t ifs_no, alt_num, ep_num, reach_endpoint = false;
 
     enum {
         STAGE_NONE = 0,
@@ -819,7 +855,7 @@ int libusb_get_config_descriptor(libusb_device *dev, uint8_t config_index,
         memset(&ldev->pipe_in[1], 0, sizeof(vk_usbh_pipe_t) * (dimof(ldev->pipe_in) - 1));
         memset(&ldev->pipe_out[1], 0, sizeof(vk_usbh_pipe_t) * (dimof(ldev->pipe_out) - 1));
 
-        err = raw_desc_to_config(ldev, buf, config);
+        err = __raw_desc_to_config(ldev, buf, config);
         if (err < 0) {
             free(buf);
         }
@@ -841,7 +877,7 @@ int libusb_get_ss_endpoint_companion_descriptor(
     return -1;
 }
 
-struct libusb_transfer *libusb_alloc_transfer(int iso_packets)
+struct libusb_transfer * libusb_alloc_transfer(int iso_packets)
 {
     uint32_t size = sizeof(vsf_linux_libusb_transfer_t) +
             iso_packets * sizeof(struct libusb_iso_packet_descriptor);
@@ -854,11 +890,11 @@ struct libusb_transfer *libusb_alloc_transfer(int iso_packets)
     return NULL;
 }
 
-static void __vsf_linux_libusb_transfer_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
+static void __vsf_libusb_transfer_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
 {
     vsf_linux_libusb_transfer_t *ltransfer = container_of(eda, vsf_linux_libusb_transfer_t, eda);
     vsf_linux_libusb_dev_t *ldev = (vsf_linux_libusb_dev_t *)ltransfer->transfer.dev_handle;
-    vk_usbh_pipe_t *pipe = __vsf_linux_libusb_get_pipe(ldev, ltransfer->transfer.endpoint);
+    vk_usbh_pipe_t *pipe = __vsf_libusb_get_pipe(ldev, ltransfer->transfer.endpoint);
     vk_usbh_urb_t *urb = &ltransfer->urb;
 //    vsf_protect_t orig;
 
@@ -884,7 +920,7 @@ int libusb_submit_transfer(struct libusb_transfer *transfer)
 {
     vsf_linux_libusb_transfer_t *ltransfer = container_of(transfer, vsf_linux_libusb_transfer_t, transfer);
     vsf_linux_libusb_dev_t *ldev = (vsf_linux_libusb_dev_t *)transfer->dev_handle;
-    vk_usbh_pipe_t *pipe = __vsf_linux_libusb_get_pipe(ldev, ltransfer->transfer.endpoint);
+    vk_usbh_pipe_t *pipe = __vsf_libusb_get_pipe(ldev, ltransfer->transfer.endpoint);
     vk_usbh_urb_t *urb = &ltransfer->urb;
     int err = LIBUSB_SUCCESS;
 
@@ -907,23 +943,23 @@ int libusb_submit_transfer(struct libusb_transfer *transfer)
         }
         break;
     case LIBUSB_TRANSFER_TYPE_ISOCHRONOUS:
-#ifndef VSFHAL_HCD_ISO_EN
-        return -1;
-#else
+#if VSF_USBH_CFG_ISO_EN == ENABLED
         urb->urb_hcd->iso_packet.number_of_packets = transfer->num_iso_packets;
         break;
+#else
+        return -1;
 #endif
     case LIBUSB_TRANSFER_TYPE_BULK:
     case LIBUSB_TRANSFER_TYPE_INTERRUPT:
         break;
     }
 
-    vsf_eda_set_evthandler(&ltransfer->eda, __vsf_linux_libusb_transfer_evthandler);
+    ltransfer->eda.fn.evthandler = __vsf_libusb_transfer_evthandler;
     vsf_eda_init(&ltransfer->eda, vsf_prio_inherit, false);
 
     if (VSF_ERR_NONE != vk_usbh_submit_urb_ex(ldev->libusb_dev->usbh, urb, 0, &ltransfer->eda)) {
         err = LIBUSB_ERROR_IO;
-        __vsf_eda_fini(&ltransfer->eda);
+        vsf_eda_fini(&ltransfer->eda);
     }
     return err;
 }

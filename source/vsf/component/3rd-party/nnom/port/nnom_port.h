@@ -13,7 +13,9 @@
 #ifndef __NNOM_PORT_H__
 #define __NNOM_PORT_H__
 
-#include "vsf.h"
+#include "service/vsf_service.h"
+#include "utilities/vsf_utilities.h"
+#include "kernel/vsf_kernel.h"
 
 //#include <stdint.h>
 //#include <string.h>
@@ -27,8 +29,8 @@
 #define nnom_memset(p,v,s)  memset(p,v,s)
 
 // runtime & debuges
-#define nnom_us_get()       vsf_systimer_tick_to_us(vsf_timer_get_tick())
-#define nnom_ms_get()       vsf_systimer_tick_to_ms(vsf_timer_get_tick())
+#define nnom_us_get()       vsf_systimer_get_us()
+#define nnom_ms_get()       vsf_systimer_get_ms()
 #define NNOM_LOG(...)       vsf_trace(VSF_TRACE_INFO, __VA_ARGS__)
 
 // NNoM configuration

@@ -15,6 +15,23 @@
  *                                                                           *
  ****************************************************************************/
 
+/****************************************************************************
+*  Copyright 2020 by Gorgon Meducer (Email:embedded_zhuoran@hotmail.com)    *
+*                                                                           *
+*  Licensed under the Apache License, Version 2.0 (the "License");          *
+*  you may not use this file except in compliance with the License.         *
+*  You may obtain a copy of the License at                                  *
+*                                                                           *
+*     http://www.apache.org/licenses/LICENSE-2.0                            *
+*                                                                           *
+*  Unless required by applicable law or agreed to in writing, software      *
+*  distributed under the License is distributed on an "AS IS" BASIS,        *
+*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *
+*  See the License for the specific language governing permissions and      *
+*  limitations under the License.                                           *
+*                                                                           *
+****************************************************************************/
+
  /*============================ INCLUDES ======================================*/
 #include "vsf.h"
 
@@ -38,95 +55,205 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 /*============================ LOCAL VARIABLES ===============================*/
-static NO_INIT vsf_tgui_t __tgui_demo;
-static NO_INIT stopwatch_t __my_stopwatch;
+static NO_INIT vsf_tgui_t s_tTGUIDemo;
+static NO_INIT stopwatch_t s_tMyStopwatch;
 
 /*============================ PROTOTYPES ====================================*/
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ IMPLEMENTATION ================================*/
 
-static void vsf_tgui_region_init_with_size(vsf_tgui_region_t* ptRegion, vsf_tgui_size_t* ptSize)
+void vsf_tgui_low_level_on_ready_to_refresh(void)
 {
-    ptRegion->tLocation.nX = 0;
-    ptRegion->tLocation.nY = 0;
-    ptRegion->tSize = *ptSize;
+    vsf_tgui_low_level_refresh_ready(&s_tTGUIDemo);
 }
-
-
-void refresh_my_stopwatch(void)
-{
-    //vk_tgui_refresh(&__tgui_demo);
-}
-
-
-static fsm_rt_t my_stopwatch_start_stop_on_click(vsf_tgui_button_t* ptNode, vsf_msgt_msg_t* ptMSG)
-{
-    return fsm_rt_cpl;
-}
-
-
 
 vsf_err_t tgui_demo_init(void)
 {
-    NO_INIT static vsf_tgui_evt_t __evt_queue_buffer[16];
-    NO_INIT static uint16_t __bfs_buffer[32];
-    
+    NO_INIT static vsf_tgui_evt_t s_tEvtQueueBuffer[32];
+
+#if VSF_TGUI_CFG_REFRESH_SCHEME == VSF_TGUI_REFRESH_SCHEME_BREADTH_FIRST_TRAVERSAL
+    NO_INIT static uint16_t s_tBFSBuffer[32];
+#endif
+
     const vsf_tgui_cfg_t cfg = {
-        .tEVTQueue = {
-            .pObj = __evt_queue_buffer, 
-            .nSize = sizeof(__evt_queue_buffer)
+        .evt_queue = {
+            .obj_ptr = s_tEvtQueueBuffer,
+            .s32_size = sizeof(s_tEvtQueueBuffer)
         },
-        .tBFSQueue = {
-            .pObj = __bfs_buffer,
-            .nSize = sizeof(__bfs_buffer),
+#if VSF_TGUI_CFG_REFRESH_SCHEME == VSF_TGUI_REFRESH_SCHEME_BREADTH_FIRST_TRAVERSAL
+        .bfs_queue = {
+            .obj_ptr = s_tBFSBuffer,
+            .s32_size = sizeof(s_tBFSBuffer),
         },
-        .ptRootNode = (vsf_tgui_control_t *)&__my_stopwatch,
+#endif
     };
-    vsf_err_t err = vk_tgui_init(&__tgui_demo, &cfg);
-    
-    my_stopwatch_init(&__my_stopwatch, &__tgui_demo);
+
+    vsf_err_t err = vk_tgui_init(&s_tTGUIDemo, &cfg);
+
+    my_stopwatch_init(&s_tMyStopwatch, &s_tTGUIDemo);
+
+    vk_tgui_set_root_container(&s_tTGUIDemo, (vsf_tgui_root_container_t *)&s_tMyStopwatch);
 
     return err;
+}
+
+void vsf_tgui_on_keyboard_evt(vk_keyboard_evt_t* evt)
+{
+//! this block of code is used for test purpose only
+    vsf_tgui_evt_t event = {
+        .tKeyEvt = {
+            .msg = vsf_input_keyboard_is_down(evt)
+                                ? VSF_TGUI_EVT_KEY_DOWN
+                                : VSF_TGUI_EVT_KEY_UP,
+            .hwKeyValue = vsf_input_keyboard_get_keycode(evt),
+        },
+    };
+
+    vk_tgui_send_message(&s_tTGUIDemo, event);
+
+    if (!vsf_input_keyboard_is_down(evt)) {
+        event.tKeyEvt.msg = VSF_TGUI_EVT_KEY_PRESSED;
+        vk_tgui_send_message(&s_tTGUIDemo, event);
+    }
 }
 
 
 void vsf_tgui_on_touchscreen_evt(vk_touchscreen_evt_t* ts_evt)
 {
-/*
-    vsf_trace(VSF_TRACE_DEBUG, "touchscreen(%d): %s x=%d, y=%d" VSF_TRACE_CFG_LINEEND,
-        VSF_INPUT_TOUCHSCREEN_GET_ID(ts_evt),
-        VSF_INPUT_TOUCHSCREEN_IS_DOWN(ts_evt) ? "down" : "up",
-        VSF_INPUT_TOUCHSCREEN_GET_X(ts_evt),
-        VSF_INPUT_TOUCHSCREEN_GET_Y(ts_evt));
- */
-    vsf_tgui_evt_t tEvent = {
-        .tPointerEvt = {
-            .tMSG = VSF_INPUT_TOUCHSCREEN_IS_DOWN(ts_evt) 
-                                ?   VSF_TGUI_EVT_POINTER_DOWN 
-                                :   VSF_TGUI_EVT_POINTER_UP,
-            
-            .nX = VSF_INPUT_TOUCHSCREEN_GET_X(ts_evt),
-            .nY = VSF_INPUT_TOUCHSCREEN_GET_Y(ts_evt),
-        },
-    };
+    //! this block of code is used for test purpose only
+    vsf_err_t result = 
+        vsf_tgui_send_touch_evt(&s_tTGUIDemo,
+                                0,  /* only one finger is used for now*/
+                                (vsf_tgui_location_t) {
+                                    vsf_input_touchscreen_get_x(ts_evt),
+                                    vsf_input_touchscreen_get_y(ts_evt)},
+                                vsf_input_touchscreen_is_down(ts_evt),
+                                ts_evt->use_as__vk_input_evt_t.duration
+                                );
 
-    vsf_tgui_send_message(&__tgui_demo, tEvent);
+    ASSERT(result == VSF_ERR_NONE);
 }
 
-void vsf_tgui_demo_on_ready(void)
+#if (VSF_TGUI_CFG_SUPPORT_MOUSE == ENABLED) && defined(VSF_TGUI_CFG_SUPPORT_MOUSE)
+void vsf_tgui_on_mouse_evt(vk_mouse_evt_t *mouse_evt)
 {
-    bool bRequirePostEvent = false;
-    vsf_sched_safe() {
-        if (__my_stopwatch.task.param.bWaitforRefresh) {
-            __my_stopwatch.task.param.bWaitforRefresh = false;
-            bRequirePostEvent = true;
-        }
+/*
+    switch (vk_input_mouse_evt_get(mouse_evt)) {
+        case VSF_INPUT_MOUSE_EVT_BUTTON:
+            vsf_trace_debug("mouse button: %d %s @(%d, %d)" VSF_TRACE_CFG_LINEEND,
+                vk_input_mouse_evt_button_get(mouse_evt),
+                vk_input_mouse_evt_button_is_down(mouse_evt) ? "down" : "up",
+                vk_input_mouse_evt_get_x(mouse_evt),
+                vk_input_mouse_evt_get_y(mouse_evt));
+            break;
+        case VSF_INPUT_MOUSE_EVT_MOVE:
+            vsf_trace_debug("mouse move: @(%d, %d)" VSF_TRACE_CFG_LINEEND,
+                vk_input_mouse_evt_get_x(mouse_evt),
+                vk_input_mouse_evt_get_y(mouse_evt));
+            break;
+        case VSF_INPUT_MOUSE_EVT_WHEEL:
+            vsf_trace_debug("mouse wheel: (%d, %d)" VSF_TRACE_CFG_LINEEND,
+                vk_input_mouse_evt_get_x(mouse_evt),
+                vk_input_mouse_evt_get_y(mouse_evt));
+            break;
     }
 
-    if (bRequirePostEvent) {
-        vsf_eda_post_evt(&(__my_stopwatch.task.use_as__vsf_eda_t), VSF_EVT_USER);
+*/
+    //! this block of code is used for test purpose only
+    int_fast8_t button_id = vk_input_mouse_evt_button_get(mouse_evt) == 0 ? 0 : 1;
+    static uint_fast8_t __button_status = 0;
+    vsf_err_t result = VSF_ERR_NONE;
+
+    switch (vk_input_mouse_evt_get(mouse_evt)) {
+        case VSF_INPUT_MOUSE_EVT_BUTTON: {
+
+            result = 
+                vsf_tgui_send_touch_evt(&s_tTGUIDemo,
+                                        button_id, 
+                                        (vsf_tgui_location_t) {
+                                            vk_input_mouse_evt_get_x(mouse_evt),
+                                            vk_input_mouse_evt_get_y(mouse_evt)},
+                                        vk_input_mouse_evt_button_is_down(mouse_evt),
+                                        mouse_evt->use_as__vk_input_evt_t.duration
+                                        );
+            
+            if (vk_input_mouse_evt_button_is_down(mouse_evt)) {
+                __button_status |= BIT(button_id);
+            } else {
+                __button_status &= ~BIT(button_id);
+            }
+
+
+            ASSERT(result == VSF_ERR_NONE);
+            break;
+        }
+
+        case VSF_INPUT_MOUSE_EVT_MOVE: {
+            if (0 == __button_status) {
+                //! pure mouse move
+                result = 
+                    vsf_tgui_send_touch_evt(&s_tTGUIDemo,
+                                            button_id, 
+                                            (vsf_tgui_location_t) {
+                                                vk_input_mouse_evt_get_x(mouse_evt),
+                                                vk_input_mouse_evt_get_y(mouse_evt)},
+                                            __button_status & BIT(button_id),
+                                            mouse_evt->use_as__vk_input_evt_t.duration
+                                            );
+            } else {
+                if (__button_status & BIT(0)) {
+                    //! simulate finger 0 move
+                    result = 
+                    vsf_tgui_send_touch_evt(&s_tTGUIDemo,
+                                            0, 
+                                            (vsf_tgui_location_t) {
+                                                vk_input_mouse_evt_get_x(mouse_evt),
+                                                vk_input_mouse_evt_get_y(mouse_evt)},
+                                            __button_status & BIT(0),
+                                            mouse_evt->use_as__vk_input_evt_t.duration
+                                            );
+                }
+                if (__button_status & BIT(1)) {
+                    //! simulate finger 1 move
+                    result = 
+                    vsf_tgui_send_touch_evt(&s_tTGUIDemo,
+                                            1, 
+                                            (vsf_tgui_location_t) {
+                                                vk_input_mouse_evt_get_x(mouse_evt),
+                                                vk_input_mouse_evt_get_y(mouse_evt)},
+                                            __button_status & BIT(1),
+                                            mouse_evt->use_as__vk_input_evt_t.duration
+                                            );
+                }
+            }
+            //ASSERT(result == VSF_ERR_NONE);
+            break;
+        }
+
+
+        case VSF_INPUT_MOUSE_EVT_WHEEL:  {
+                vsf_tgui_evt_t event = {
+                    .tGestureEvt = {
+                        .msg = VSF_TGUI_EVT_GESTURE_WHEEL,
+                        .delta = {
+                            .iX = 0,
+                            .iY = vk_input_mouse_evt_get_y(mouse_evt),
+                            .ms = 20,            //! 50Hz
+                        },
+                    },
+                };
+
+                vsf_tgui_control_set_active(vsf_tgui_pointed_control_get(&s_tTGUIDemo));
+                vk_tgui_send_message(&s_tTGUIDemo, event);
+                break;
+            }
+
+        default:
+            break;
     }
+
 }
+#endif
 
 #endif
 

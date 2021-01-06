@@ -75,13 +75,13 @@
 #define __end_def_class(__NAME)
 
 #define __def_class(__NAME, __MEMBER)                                           \
-    typedef struct __NAME __NAME;                                               \
+    /*typedef struct __NAME __NAME; */                                          \
     struct __NAME {                                                             \
         __MEMBER                                                                \
     };                      
     
 
-#if     defined(__PLOOC_CLASS_IMPLEMENT)
+#if     defined(__PLOOC_CLASS_IMPLEMENT__)
 
 #   undef  __class
 #   define __class(__NAME)                  __NAME
@@ -102,7 +102,7 @@
 
 #define __end_extern_class(__NAME)
         
-#elif   defined(__PLOOC_CLASS_INHERIT)
+#elif   defined(__PLOOC_CLASS_INHERIT__)
 
 #   undef  __class_protected
 #   define __class_protected(__NAME)            __NAME
@@ -145,8 +145,8 @@
 
 #define end_extern_class(__NAME)        __end_extern_class(__NAME)
 
-#undef __PLOOC_CLASS_IMPLEMENT
-#undef __PLOOC_CLASS_INHERIT
+#undef __PLOOC_CLASS_IMPLEMENT__
+#undef __PLOOC_CLASS_INHERIT__
 /*============================ TYPES =========================================*/
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ LOCAL VARIABLES ===============================*/

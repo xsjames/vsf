@@ -1,6 +1,13 @@
 #ifndef __TERMIOS_H__
 #define __TERMIOS_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define tcgetattr   __vsf_linux_tcgetattr
+#define tcsetattr   __vsf_linux_tcsetattr
+
 typedef unsigned int tcflag_t;
 
 #define IGNBRK      0000001
@@ -63,5 +70,9 @@ struct termios {
 
 int tcgetattr(int fd, struct termios *termios);
 int tcsetattr(int fd, int optional_actions, const struct termios *termios);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

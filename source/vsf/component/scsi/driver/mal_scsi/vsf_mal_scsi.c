@@ -19,14 +19,14 @@
 
 #include "../../vsf_scsi_cfg.h"
 
-#if VSF_USE_SCSI == ENABLED && VSF_USE_MAL_SCSI == ENABLED
+#if VSF_USE_SCSI == ENABLED && VSF_USE_MAL == ENABLED && VSF_SCSI_USE_MAL_SCSI == ENABLED
 
-#define VSF_SCSI_INHERIT
-#define VSF_VIRTUAL_SCSI_INHERIT
-#define VSF_MAL_SCSI_IMPLEMENT
+#define __VSF_SCSI_CLASS_INHERIT__
+#define __VSF_VIRTUAL_SCSI_CLASS_INHERIT__
+#define __VSF_MAL_SCSI_CLASS_IMPLEMENT
 
-// TODO: use dedicated include
-#include "vsf.h"
+#include "../../vsf_scsi.h"
+#include "./vsf_mal_scsi.h"
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -34,24 +34,41 @@
 /*============================ PROTOTYPES ====================================*/
 
 static bool __vk_mal_scsi_buffer(vk_scsi_t *scsi, bool is_read, uint_fast64_t addr, uint_fast32_t size, vsf_mem_t *mem);
-static void __vk_mal_scsi_init(uintptr_t target, vsf_evt_t evt);
-static void __vk_mal_scsi_read(uintptr_t target, vsf_evt_t evt);
-static void __vk_mal_scsi_write(uintptr_t target, vsf_evt_t evt);
+dcl_vsf_peda_methods(static, __vk_mal_scsi_init)
+dcl_vsf_peda_methods(static, __vk_mal_scsi_read)
+dcl_vsf_peda_methods(static, __vk_mal_scsi_write)
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
-const i_virtual_scsi_drv_t VK_MAL_VIRTUAL_SCSI_DRV = {
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
+const vk_virtual_scsi_drv_t vk_mal_virtual_scsi_drv = {
     .drv_type               = VSF_VIRTUAL_SCSI_DRV_PARAM_SUBCALL,
     .param_subcall          = {
         .buffer             = __vk_mal_scsi_buffer,
-        .init               = __vk_mal_scsi_init,
-        .read               = __vk_mal_scsi_read,
-        .write              = __vk_mal_scsi_write,
+        .init               = (vsf_peda_evthandler_t)vsf_peda_func(__vk_mal_scsi_init),
+        .read               = (vsf_peda_evthandler_t)vsf_peda_func(__vk_mal_scsi_read),
+        .write              = (vsf_peda_evthandler_t)vsf_peda_func(__vk_mal_scsi_write),
     },
 };
 
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#endif
+
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ IMPLEMENTATION ================================*/
+
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-align"
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wcast-align"
+#endif
 
 static bool __vk_mal_scsi_buffer(vk_scsi_t *scsi, bool is_read, uint_fast64_t addr, uint_fast32_t size, vsf_mem_t *mem)
 {
@@ -62,78 +79,87 @@ static bool __vk_mal_scsi_buffer(vk_scsi_t *scsi, bool is_read, uint_fast64_t ad
                 is_read ? VSF_MAL_OP_READ : VSF_MAL_OP_WRITE, mem);
 }
 
-static void __vk_mal_scsi_return(vk_mal_scsi_t *mal_scsi)
+__vsf_component_peda_ifs_entry(__vk_mal_scsi_init, vk_virtual_scsi_init)
 {
-    mal_scsi->result.errcode = vk_mal_get_result(mal_scsi->mal, &mal_scsi->result.reply_len);
-    vsf_eda_return();
-}
-
-static void __vk_mal_scsi_init(uintptr_t target, vsf_evt_t evt)
-{
-    vk_mal_scsi_t *mal_scsi = (vk_mal_scsi_t *)target;
+    vsf_peda_begin();
+    vk_mal_scsi_t *mal_scsi = (vk_mal_scsi_t *)&vsf_this;
 
     switch (evt) {
     case VSF_EVT_INIT:
+#if VSF_USE_SIMPLE_STREAM == ENABLED
+        mal_scsi->mal_stream.mal = mal_scsi->mal;
+#endif
         vk_mal_init(mal_scsi->mal);
         break;
     case VSF_EVT_RETURN:
-        __vk_mal_scsi_return(mal_scsi);
+        vsf_eda_return(vsf_eda_get_return_value());
         break;
     }
+    vsf_peda_end();
 }
 
-static void __vk_mal_scsi_read(uintptr_t target, vsf_evt_t evt)
+__vsf_component_peda_ifs_entry(__vk_mal_scsi_read, vk_virtual_scsi_read)
 {
-    vk_mal_scsi_t *mal_scsi = (vk_mal_scsi_t *)target;
+    vsf_peda_begin();
+    vk_mal_scsi_t *mal_scsi = (vk_mal_scsi_t *)&vsf_this;
     vk_virtual_scsi_param_t *param = mal_scsi->param;
 
     switch (evt) {
     case VSF_EVT_INIT:
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+#if VSF_USE_SIMPLE_STREAM == ENABLED
         if (mal_scsi->is_stream) {
-            vk_mal_read_stream(mal_scsi->mal,
-                mal_scsi->addr * param->block_size, mal_scsi->size * param->block_size,
-                mal_scsi->args.stream);
+            vk_mal_read_stream(&mal_scsi->mal_stream,
+                vsf_local.addr * param->block_size, vsf_local.size * param->block_size,
+                (vsf_stream_t *)vsf_local.mem_stream);
         } else {
 #endif
             vk_mal_read(mal_scsi->mal,
-                mal_scsi->addr * param->block_size, mal_scsi->size * param->block_size,
-                mal_scsi->args.mem.pchBuffer);
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+                vsf_local.addr * param->block_size, vsf_local.size * param->block_size,
+                ((vsf_mem_t *)vsf_local.mem_stream)->buffer);
+#if VSF_USE_SIMPLE_STREAM == ENABLED
         }
 #endif
         break;
     case VSF_EVT_RETURN:
-        __vk_mal_scsi_return(mal_scsi);
+        vsf_eda_return(vsf_eda_get_return_value());
         break;
     }
+    vsf_peda_end();
 }
 
-static void __vk_mal_scsi_write(uintptr_t target, vsf_evt_t evt)
+__vsf_component_peda_ifs_entry(__vk_mal_scsi_write, vk_virtual_scsi_write)
 {
-    vk_mal_scsi_t *mal_scsi = (vk_mal_scsi_t *)target;
+    vsf_peda_begin();
+    vk_mal_scsi_t *mal_scsi = (vk_mal_scsi_t *)&vsf_this;
     vk_virtual_scsi_param_t *param = mal_scsi->param;
 
     switch (evt) {
     case VSF_EVT_INIT:
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+#if VSF_USE_SIMPLE_STREAM == ENABLED
         if (mal_scsi->is_stream) {
-            vk_mal_write_stream(mal_scsi->mal,
-                mal_scsi->addr * param->block_size, mal_scsi->size * param->block_size,
-                mal_scsi->args.stream);
+            vk_mal_write_stream(&mal_scsi->mal_stream,
+                vsf_local.addr * param->block_size, vsf_local.size * param->block_size,
+                (vsf_stream_t *)vsf_local.mem_stream);
         } else {
 #endif
             vk_mal_write(mal_scsi->mal,
-                mal_scsi->addr * param->block_size, mal_scsi->size * param->block_size,
-                mal_scsi->args.mem.pchBuffer);
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+                vsf_local.addr * param->block_size, vsf_local.size * param->block_size,
+                ((vsf_mem_t *)vsf_local.mem_stream)->buffer);
+#if VSF_USE_SIMPLE_STREAM == ENABLED
         }
 #endif
         break;
     case VSF_EVT_RETURN:
-        __vk_mal_scsi_return(mal_scsi);
+        vsf_eda_return(vsf_eda_get_return_value());
         break;
     }
+    vsf_peda_end();
 }
+
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic pop
+#endif
 
 #endif

@@ -25,46 +25,75 @@
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
-
+#if 0
 declare_vsf_pt(tgui_demo_t)
 def_vsf_pt(tgui_demo_t,
     def_params(
-        bool bWaitforRefresh;
     )
 )
 end_def_vsf_pt(tgui_demo_t)
-
+#endif
 
 declare_tgui_panel(stopwatch_t)
 
 def_tgui_panel(stopwatch_t,
     tgui_contains(
-        vsf_tgui_label_t     time;
-        vsf_tgui_button_t    start_stop;
-        vsf_tgui_button_t    lap;
-        vsf_tgui_button_t    Setting;
 
-        use_tgui_container(vcontainer, 
+        use_tgui_container(tLeftContainer,
             tgui_contains(
-                vsf_tgui_label_t     history;
-                vsf_tgui_button_t    button1;
-                vsf_tgui_button_t    button2;
+                vsf_tgui_label_t     tTime;
+                vsf_tgui_button_t    tStartStop;
+                vsf_tgui_button_t    tLap;
+                vsf_tgui_button_t    tSetting;
 
-                use_tgui_container(hcontainer,
+                use_tgui_container(tContainerA,
                     tgui_contains(
-                        vsf_tgui_button_t    buttonA;
-                        vsf_tgui_button_t    buttonB;
-                        vsf_tgui_button_t    buttonC;
+                    #if VSF_TGUI_CFG_SUPPORT_TEXT_LIST == ENABLED
+                        vsf_tgui_text_list_t  tNumberList;
+                    #endif
+
+                    #if VSF_TGUI_CFG_SUPPORT_LIST == ENABLED
+                        use_tgui_list(tVContainer,
+                            tgui_contains(
+
+                                vsf_tgui_button_t    tButton1;
+                                vsf_tgui_button_t    tButton2;
+
+                                use_tgui_list(tHContainer,
+                                    tgui_contains(
+                                        vsf_tgui_button_t    tButtonA;
+                                        vsf_tgui_button_t    tButtonB;
+                                        vsf_tgui_button_t    tButtonC;
+                                    )
+                                )
+
+                                vsf_tgui_label_t     tHistory;
+                            )
+                        )
+                    #else
+                        vsf_tgui_button_t    tButton1;
+                        vsf_tgui_button_t    tButton2;
+                        vsf_tgui_label_t     tHistory;
+                    #endif
                     )
                 )
+        ))
+
+        use_tgui_panel(tRightPanel,
+            tgui_contains(
+                vsf_tgui_button_t tKey[10];
             )
         )
+
+        #if VSF_TGUI_CFG_SUPPORT_TIMER == ENABLED
+            vsf_tgui_timer_t tTimer;
+        #endif
+
 	))
 
-    uint32_t    cnt;
-    char        chTimeBuffer[sizeof("00:00")];
+    char        chTimeBuffer[sizeof("00:00:00")];
 
-    tgui_demo_t task;
+    //tgui_demo_t tTask;
 
 end_def_tgui_panel(stopwatch_t)
 
@@ -74,7 +103,7 @@ end_def_tgui_panel(stopwatch_t)
 /*============================ IMPLEMENTATION ================================*/
 
 extern
-stopwatch_t* my_stopwatch_init(stopwatch_t* ptPanel, vsf_tgui_t *ptGUI);
+stopwatch_t* my_stopwatch_init(stopwatch_t* ptPanel, vsf_tgui_t *gui_ptr);
 
 #endif
 #endif

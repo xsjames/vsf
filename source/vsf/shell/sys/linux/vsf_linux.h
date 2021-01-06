@@ -15,28 +15,34 @@
  *                                                                           *
  ****************************************************************************/
 
-
-
 #ifndef __VSF_LINUX_H__
 #define __VSF_LINUX_H__
 
 /*============================ INCLUDES ======================================*/
+
 #include "./vsf_linux_cfg.h"
 
 #if VSF_USE_LINUX == ENABLED
 
-#include "vsf.h"
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED
+#   include "./include/signal.h"
+#   include "./include/dirent.h"
+#else
+#   include <signal.h>
+#   include <dirent.h>
+#endif
 
-#include <unistd.h>
-#include <signal.h>
-
-#if     defined(VSF_LINUX_IMPLEMENT)
-#   define __PLOOC_CLASS_IMPLEMENT
-#elif   defined(VSF_LINUX_INHERIT)
-#   define __PLOOC_CLASS_INHERIT
+#if     defined(__VSF_LINUX_CLASS_IMPLEMENT)
+#   define __PLOOC_CLASS_IMPLEMENT__
+#elif   defined(__VSF_LINUX_CLASS_INHERIT__)
+#   define __PLOOC_CLASS_INHERIT__
 #endif
 
 #include "utilities/ooc_class.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 
@@ -48,34 +54,45 @@
 #   define VSF_LINUX_CFG_MAX_ARG_NUM        31
 #endif
 
+#ifndef VSF_LINUX_CFG_STACKSIZE
+#   define VSF_LINUX_CFG_STACKSIZE          1024
+#endif
+#if VSF_LINUX_CFG_STACKSIZE > 0xFFFF
+#   error VSF_LINUX_CFG_STACKSIZE should be 16-bit
+#endif
+#if     (VSF_LINUX_CFG_STACKSIZE < (VSF_KERNEL_CFG_THREAD_STACK_PAGE_SIZE + VSF_KERNEL_CFG_THREAD_STACK_GUARDIAN_SIZE))\
+    ||  VSF_LINUX_CFG_STACKSIZE & (VSF_KERNEL_CFG_THREAD_STACK_PAGE_SIZE - 1)
+#   error invalid VSF_LINUX_CFG_STACKSIZE
+#endif
+
 /*============================ MACROFIED FUNCTIONS ===========================*/
+
+#define vsf_linux_thread_get_priv(__thread)         (void *)(&(((vsf_linux_thread_t *)(__thread))[1]))
+
 /*============================ TYPES =========================================*/
 
-declare_simple_class(vsf_linux_process_t)
-declare_simple_class(vsf_linux_thread_t)
-declare_simple_class(vsf_linux_fd_t)
+dcl_simple_class(vsf_linux_process_t)
+dcl_simple_class(vsf_linux_thread_t)
+dcl_simple_class(vsf_linux_fd_t)
 
-struct vsf_linux_process_arg_t {
+typedef struct vsf_linux_process_arg_t {
     int argc;
     char const *argv[VSF_LINUX_CFG_MAX_ARG_NUM + 1];
-};
-typedef struct vsf_linux_process_arg_t vsf_linux_process_arg_t;
+} vsf_linux_process_arg_t;
 
 typedef int (*vsf_linux_main_entry_t)(int, char **);
 typedef int (*vsf_linux_process_arg_parser_t)(vsf_linux_process_arg_t *arg);
 
-struct vsf_linux_thread_op_t {
+typedef struct vsf_linux_thread_op_t {
     int priv_size;
     void (*on_run)(vsf_thread_cb_t *cb);
     void (*on_terminate)(vsf_linux_thread_t *thread);
-};
-typedef struct vsf_linux_thread_op_t vsf_linux_thread_op_t;
+} vsf_linux_thread_op_t;
 
-struct vsf_linux_process_ctx_t {
+typedef struct vsf_linux_process_ctx_t {
     vsf_linux_process_arg_t arg;
     vsf_linux_main_entry_t entry;
-};
-typedef struct vsf_linux_process_ctx_t vsf_linux_process_ctx_t;
+} vsf_linux_process_ctx_t;
 
 def_simple_class(vsf_linux_thread_t) {
     public_member(
@@ -99,19 +116,17 @@ def_simple_class(vsf_linux_thread_t) {
     )
 };
 
-struct vsf_linux_sig_handler_t {
+typedef struct vsf_linux_sig_handler_t {
     vsf_dlist_node_t node;
     uint_fast8_t sig;
     void (*handler)(int, siginfo_t *, void *);
-};
-typedef struct vsf_linux_sig_handler_t vsf_linux_sig_handler_t;
+} vsf_linux_sig_handler_t;
 
-struct vsf_linux_stdio_stream_t {
+typedef struct vsf_linux_stdio_stream_t {
     vsf_stream_t *in;
     vsf_stream_t *out;
     vsf_stream_t *err;
-};
-typedef struct vsf_linux_stdio_stream_t vsf_linux_stdio_stream_t;
+} vsf_linux_stdio_stream_t;
 
 def_simple_class(vsf_linux_process_t) {
     public_member(
@@ -145,14 +160,13 @@ def_simple_class(vsf_linux_process_t) {
     )
 };
 
-struct vsf_linux_fd_op_t {
+typedef struct vsf_linux_fd_op_t {
     int priv_size;
-    int (*fcntl)(vsf_linux_fd_t *sfd, int cmd, long arg);
-    ssize_t (*read)(vsf_linux_fd_t *sfd, void *buf, size_t count);
-    ssize_t (*write)(vsf_linux_fd_t *sfd, void *buf, size_t count);
-    int (*close)(vsf_linux_fd_t *sfd);
-};
-typedef struct vsf_linux_fd_op_t vsf_linux_fd_op_t;
+    int (*fn_fcntl)(vsf_linux_fd_t *sfd, int cmd, long arg);
+    ssize_t (*fn_read)(vsf_linux_fd_t *sfd, void *buf, size_t count);
+    ssize_t (*fn_write)(vsf_linux_fd_t *sfd, void *buf, size_t count);
+    int (*fn_close)(vsf_linux_fd_t *sfd);
+} vsf_linux_fd_op_t;
 
 def_simple_class(vsf_linux_fd_t) {
     protected_member(
@@ -168,9 +182,27 @@ def_simple_class(vsf_linux_fd_t) {
 
     private_member(
         vsf_dlist_node_t fd_node;
+    )
+
+    protected_member(
+#if __IS_COMPILER_IAR__
+        // make compiler happy by waisting 4 bytes
+        int priv[1];
+#else
         int priv[0];
+#endif
     )
 };
+
+#if defined(__VSF_LINUX_CLASS_IMPLEMENT) || defined(__VSF_LINUX_CLASS_INHERIT__)
+typedef struct vsf_linux_fs_priv_t {
+    vk_file_t *file;
+    uint64_t pos;
+
+    struct dirent dir;
+    vk_file_t *child;
+} vsf_linux_fs_priv_t;
+#endif
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ LOCAL VARIABLES ===============================*/
@@ -178,11 +210,12 @@ def_simple_class(vsf_linux_fd_t) {
 
 extern vsf_err_t vsf_linux_init(vsf_linux_stdio_stream_t *stdio_stream);
 
-extern int vsf_linux_fs_bind_target(int fd, void *target, vsf_param_eda_evthandler_t read,
-        vsf_param_eda_evthandler_t write);
+extern int vsf_linux_fs_bind_target(int fd, void *target,
+        vsf_param_eda_evthandler_t peda_read,
+        vsf_param_eda_evthandler_t peda_write);
 extern int vsf_linux_fs_bind_executable(int fd, vsf_linux_main_entry_t entry);
 
-#if defined(VSF_LINUX_IMPLEMENT) || defined(VSF_LINUX_INHERIT)
+#if defined(__VSF_LINUX_CLASS_IMPLEMENT) || defined(__VSF_LINUX_CLASS_INHERIT__)
 extern int vsf_linux_fs_get_executable(const char *pathname, vsf_linux_main_entry_t *entry);
 
 extern vsf_linux_process_t * vsf_linux_create_process(int stack_size);
@@ -210,8 +243,12 @@ extern int vsf_linux_fd_rx_trigger(int fd);
 extern vk_vfs_file_t * vsf_linux_fs_get_vfs(int fd);
 #endif
 
-#undef VSF_LINUX_IMPLEMENT
-#undef VSF_LINUX_INHERIT
+#ifdef __cplusplus
+}
+#endif
+
+#undef __VSF_LINUX_CLASS_IMPLEMENT
+#undef __VSF_LINUX_CLASS_INHERIT__
 
 #endif      // VSF_USE_LINUX
 #endif      // __VSF_LINUX_H__

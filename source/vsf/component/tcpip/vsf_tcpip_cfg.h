@@ -24,10 +24,9 @@
 
 /*============================ MACROS ========================================*/
 
-// ETH
-#define TCPIP_ETH_HWTYPE            1
-#define TCPIP_ETH_HEADSIZE          14
-#define TCPIP_ETH_ADDRLEN           6
+#ifndef VSF_TCPIP_ASSERT
+#   define VSF_TCPIP_ASSERT             ASSERT
+#endif
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/

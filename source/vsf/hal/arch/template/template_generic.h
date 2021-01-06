@@ -25,10 +25,17 @@
 #include "hal/driver/driver.h"
 #undef  __VSF_HEADER_ONLY_SHOW_ARCH_INFO__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*============================ MACROS ========================================*/
 
-#define __LITTLE_ENDIAN                 1
-#define __BYTE_ORDER                    __LITTLE_ENDIAN
+#ifndef __LITTLE_ENDIAN
+#   define __LITTLE_ENDIAN                 1
+#endif
+#ifndef __BYTE_ORDER
+#   define __BYTE_ORDER                    __LITTLE_ENDIAN
+#endif
 
 #ifndef VSF_ARCH_PRI_NUM
 #   define VSF_ARCH_PRI_NUM             0
@@ -58,10 +65,10 @@ enum vsf_arch_prio_t {
     // avoid vsf_arch_prio_t to be optimized to 8bit
     __VSF_ARCH_PRIO_LEAST_MAX       = INT16_MAX,
     __VSF_ARCH_PRIO_LEAST_MIN       = INT16_MIN,
-    VSF_ARCH_PRIO_IVALID            = -1,
-    vsf_arch_prio_ivalid            = -1,
+    VSF_ARCH_PRIO_INVALID           = -1,
+    vsf_arch_prio_invalid           = -1,
 
-    MREPEAT(VSF_ARCH_PRI_NUM, __VSF_ARCH_PRI, 0)
+    REPEAT_MACRO(VSF_ARCH_PRI_NUM, __VSF_ARCH_PRI, 0)
 };
 typedef enum vsf_arch_prio_t vsf_arch_prio_t;
 #endif
@@ -75,6 +82,10 @@ static ALWAYS_INLINE void vsf_arch_set_stack(uint32_t stack)
 {
     VSF_HAL_ASSERT(false);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 /* EOF */

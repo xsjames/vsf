@@ -19,11 +19,15 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if VSF_USE_USB_HOST == ENABLED && VSF_USE_USB_HOST_HUB == ENABLED
+#if VSF_USE_USB_HOST == ENABLED && VSF_USBH_USE_HUB == ENABLED
 
-#define VSF_USBH_IMPLEMENT_HUB
-#include "vsf.h"
-#include "../../../common/class/HUB/vsf_usb_HUB.h"
+#define __VSF_EDA_CLASS_INHERIT__
+#define __VSF_USBH_CLASS_IMPLEMENT_CLASS__
+#define __VSF_USBH_CLASS_IMPLEMENT_HUB__
+
+#include "kernel/vsf_kernel.h"
+#include "../../vsf_usbh.h"
+#include "./vsf_usbh_HUB.h"
 
 /*============================ MACROS ========================================*/
 
@@ -34,7 +38,7 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct vk_usbh_hub_t {
+typedef struct vk_usbh_hub_t {
     vsf_teda_t teda;
 
     vk_usbh_t *usbh;
@@ -79,12 +83,11 @@ struct vk_usbh_hub_t {
     uint8_t retry                   : 4;
     uint8_t cur_dev_idx;            /* start from 1 */
     uint16_t reset_mask;
-};
-typedef struct vk_usbh_hub_t vk_usbh_hub_t;
+} vk_usbh_hub_t;
 
 /*============================ LOCAL VARIABLES ===============================*/
 
-static const vk_usbh_dev_id_t vk_usbh_hub_dev_id[] = {
+static const vk_usbh_dev_id_t __vk_usbh_hub_dev_id[] = {
     {
         .match_ifs_class = 1,
         .bInterfaceClass = USB_CLASS_HUB,
@@ -93,27 +96,23 @@ static const vk_usbh_dev_id_t vk_usbh_hub_dev_id[] = {
 
 /*============================ PROTOTYPES ====================================*/
 
-static void *vk_usbh_hub_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs);
-static void vk_usbh_hub_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param);
+static void *__vk_usbh_hub_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs);
+static void __vk_usbh_hub_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param);
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
 const vk_usbh_class_drv_t vk_usbh_hub_drv = {
     .name       = "hub",
-    .dev_id_num = dimof(vk_usbh_hub_dev_id),
-    .dev_ids    = vk_usbh_hub_dev_id,
-    .probe      = vk_usbh_hub_probe,
-    .disconnect = vk_usbh_hub_disconnect,
+    .dev_id_num = dimof(__vk_usbh_hub_dev_id),
+    .dev_ids    = __vk_usbh_hub_dev_id,
+    .probe      = __vk_usbh_hub_probe,
+    .disconnect = __vk_usbh_hub_disconnect,
 };
 
 /*============================ PROTOTYPES ====================================*/
-
-SECTION(".text.vsf.kernel.eda")
-vsf_err_t __vsf_eda_fini(vsf_eda_t *pthis);
-
 /*============================ IMPLEMENTATION ================================*/
 
-static vk_usbh_hub_t *hub_dev_gethub(vk_usbh_dev_t *dev_hub)
+static vk_usbh_hub_t *__vk_usbh_hub_dev_gethub(vk_usbh_dev_t *dev_hub)
 {
     vk_usbh_hub_t *hub = NULL;
     vk_usbh_ifs_t *ifs = dev_hub->ifs;
@@ -127,7 +126,7 @@ static vk_usbh_hub_t *hub_dev_gethub(vk_usbh_dev_t *dev_hub)
     return hub;
 }
 
-static vk_usbh_dev_t *hub_getdev(vk_usbh_hub_t *hub, uint_fast8_t index)
+static vk_usbh_dev_t *__vk_usbh_hub_getdev(vk_usbh_hub_t *hub, uint_fast8_t index)
 {
     vk_usbh_dev_t *dev = hub->dev->children_list.head;
     do {
@@ -139,7 +138,7 @@ static vk_usbh_dev_t *hub_getdev(vk_usbh_hub_t *hub, uint_fast8_t index)
     return NULL;
 }
 
-static vsf_err_t hub_set_port_feature(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
+static vsf_err_t __vk_usbh_hub_set_port_feature(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
         uint_fast16_t port, uint_fast16_t feature)
 {
     struct usb_ctrlrequest_t req = {
@@ -151,7 +150,7 @@ static vsf_err_t hub_set_port_feature(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
     };
     return vk_usbh_control_msg(usbh, dev, &req);
 }
-static vsf_err_t hub_get_port_status(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
+static vsf_err_t __vk_usbh_hub_get_port_status(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
         uint_fast16_t port)
 {
     struct usb_ctrlrequest_t req = {
@@ -163,7 +162,7 @@ static vsf_err_t hub_get_port_status(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
     };
     return vk_usbh_control_msg(usbh, dev, &req);
 }
-static vsf_err_t hub_clear_port_feature(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
+static vsf_err_t __vk_usbh_hub_clear_port_feature(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
         uint_fast16_t port, uint_fast16_t feature)
 {
     struct usb_ctrlrequest_t req = {
@@ -177,7 +176,7 @@ static vsf_err_t hub_clear_port_feature(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
 }
 
 /*
-static vsf_err_t hub_get_status(vk_usbh_t *usbh, vk_usbh_dev_t *dev)
+static vsf_err_t __vk_usbh_hub_get_status(vk_usbh_t *usbh, vk_usbh_dev_t *dev)
 {
     struct usb_ctrlrequest_t req = {
         .bRequestType    =  USB_TYPE_CLASS | USB_RECIP_DEVICE | USB_DIR_IN,
@@ -190,7 +189,7 @@ static vsf_err_t hub_get_status(vk_usbh_t *usbh, vk_usbh_dev_t *dev)
 }
 */
 
-static vsf_err_t hub_get_descriptor(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
+static vsf_err_t __vk_usbh_hub_get_descriptor(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
         uint_fast16_t size)
 {
     struct usb_ctrlrequest_t req = {
@@ -203,7 +202,7 @@ static vsf_err_t hub_get_descriptor(vk_usbh_t *usbh, vk_usbh_dev_t *dev,
     return vk_usbh_control_msg(usbh, dev, &req);
 }
 
-static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
+static void __vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
 {
     vk_usbh_hub_t *hub = (vk_usbh_hub_t *)eda;
     vk_usbh_dev_t *dev = hub->dev;
@@ -215,7 +214,7 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
     case VSF_EVT_INIT:
         hub->state = HUB_STAT_ENUM_START;
         vk_usbh_urb_set_buffer(urb, &hub->desc_hub, 4);
-        err = hub_get_descriptor(hub->usbh, dev, 4);
+        err = __vk_usbh_hub_get_descriptor(hub->usbh, dev, 4);
         break;
     case VSF_EVT_MESSAGE:
         if (vk_usbh_urb_get_status(urb) != URB_OK) { goto fail; }
@@ -229,7 +228,7 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
             if (hub->desc_hub.bDescLength > sizeof(hub->desc_hub)) {
                 goto fail;
             }
-            err = hub_get_descriptor(hub->usbh, dev, hub->desc_hub.bDescLength);
+            err = __vk_usbh_hub_get_descriptor(hub->usbh, dev, hub->desc_hub.bDescLength);
             break;
         case HUB_STAT_ENUM_WAIT_HUB_DESC:
             dev->maxchild = hub->desc_hub.bNbrPorts;
@@ -237,7 +236,7 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
 
         enum_set_next_power_on:
             hub->cur_dev_idx++;
-            err = hub_set_port_feature(hub->usbh, dev, hub->cur_dev_idx,
+            err = __vk_usbh_hub_set_port_feature(hub->usbh, dev, hub->cur_dev_idx,
                     USB_PORT_FEAT_POWER);
             break;
         case HUB_STAT_ENUM_WAIT_PORT_POWER_ON:
@@ -252,11 +251,10 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
             vsf_teda_set_timer_ms(20);
             break;
         case HUB_STAT_RESET_CHILD_WAIT_GET_PORT_STATUS:
-            // clear reset mask here
-            hub->reset_mask &= ~(1 << (hub->cur_dev_idx - 1));
-
             // check port status after reset
             if (hub->hub_portsts.wPortStatus & USB_PORT_STAT_ENABLE) {
+                hub->reset_mask &= ~(1 << (hub->cur_dev_idx - 1));
+
                 // reset ready
                 if (hub->is_child_connecting) {
                     // reset child while connecting
@@ -282,26 +280,26 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
                 // try to connect new child
                 hub->state = HUB_STAT_CONNECT_START;
                 // clear the cnnection change state
-                err = hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
+                err = __vk_usbh_hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
                         USB_PORT_FEAT_C_CONNECTION);
             } else if (hub->hub_portsts.wPortChange & USB_PORT_STAT_C_ENABLE) {
                 hub->hub_portsts.wPortChange &= ~USB_PORT_STAT_C_ENABLE;
-                err = hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
+                err = __vk_usbh_hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
                         USB_PORT_FEAT_C_ENABLE);
                 retain_state = true;
             } else if (hub->hub_portsts.wPortChange & USB_PORT_STAT_C_SUSPEND) {
                 hub->hub_portsts.wPortChange &= ~USB_PORT_STAT_C_SUSPEND;
-                err = hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
+                err = __vk_usbh_hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
                         USB_PORT_FEAT_C_SUSPEND);
                 retain_state = true;
             } else if (hub->hub_portsts.wPortChange & USB_PORT_STAT_C_OVERCURRENT) {
                 hub->hub_portsts.wPortChange &= ~USB_PORT_FEAT_C_OVER_CURRENT;
-                err = hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
+                err = __vk_usbh_hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
                         USB_PORT_FEAT_C_OVER_CURRENT);
                 retain_state = true;
             } else if (hub->hub_portsts.wPortChange & USB_PORT_STAT_C_RESET) {
                 hub->hub_portsts.wPortChange &= ~USB_PORT_FEAT_C_RESET;
-                err = hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
+                err = __vk_usbh_hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
                         USB_PORT_FEAT_C_RESET);
                 retain_state = true;
             } else if (hub->usbh->dev_new != NULL) {
@@ -327,7 +325,7 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
         case HUB_STAT_CONNECT_WAIT_PORT_CLEAR_CONNECT_CHANGE:
             if (!(hub->hub_portsts.wPortStatus & USB_PORT_STAT_CONNECTION)) {
                 // child removed
-                vk_usbh_dev_t *dev = hub_getdev(hub, hub->cur_dev_idx - 1);
+                vk_usbh_dev_t *dev = __vk_usbh_hub_getdev(hub, hub->cur_dev_idx - 1);
 
                 if (dev != NULL) {
                     vk_usbh_disconnect_device(hub->usbh, dev);
@@ -335,7 +333,7 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
 
                 hub->state = HUB_STAT_SCAN_WAIT_GET_PORT_STATUS;
                 if (hub->hub_portsts.wPortStatus & USB_PORT_STAT_ENABLE) {
-                    err = hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
+                    err = __vk_usbh_hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
                             USB_PORT_FEAT_ENABLE);
                     retain_state = true;
                 } else {
@@ -354,6 +352,13 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
             break;
         }
         break;
+    case VSF_EVT_USER:
+        if (!hub->is_waiting_next_round) {
+            break;
+        }
+
+        // cancel timer and force to polling next
+        vsf_teda_cancel_timer();
     case VSF_EVT_TIMER:
         switch (hub->state) {
         default:
@@ -375,7 +380,7 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
                     hub->state = HUB_STAT_RESET_CHILD_START;
                     hub->retry = 0;
                     // send command to reset port
-                    err = hub_set_port_feature(hub->usbh, dev, hub->cur_dev_idx,
+                    err = __vk_usbh_hub_set_port_feature(hub->usbh, dev, hub->cur_dev_idx,
                             USB_PORT_FEAT_RESET);
                 } else {
                     goto get_port_status;
@@ -384,14 +389,14 @@ static void vk_usbh_hub_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
             break;
         case HUB_STAT_RESET_CHILD_WAIT_PORT_RESET_STABLE:
             // clear reset
-            err = hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
+            err = __vk_usbh_hub_clear_port_feature(hub->usbh, dev, hub->cur_dev_idx,
                     USB_PORT_FEAT_C_RESET);
             break;
         case HUB_STAT_RESET_CHILD_WAIT_PORT_CLEAR_RESET_STABLE:
         get_port_status:
             // get port status
             vk_usbh_urb_set_buffer(urb, &hub->hub_portsts, sizeof(hub->hub_portsts));
-            err = hub_get_port_status(hub->usbh, dev, hub->cur_dev_idx);
+            err = __vk_usbh_hub_get_port_status(hub->usbh, dev, hub->cur_dev_idx);
             break;
         case HUB_STAT_RESET_CHILD_WAIT_NEXT_RETRY:
             goto reset_child;
@@ -445,13 +450,13 @@ fail:
     }
 }
 
-static void vk_usbh_hub_on_eda_terminate(vsf_eda_t *eda)
+static void __vk_usbh_hub_on_eda_terminate(vsf_eda_t *eda)
 {
     vk_usbh_hub_t *hub = container_of(eda, vk_usbh_hub_t, teda);
-    VSF_USBH_FREE(hub);
+    vsf_usbh_free(hub);
 }
 
-static void *vk_usbh_hub_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs)
+static void *__vk_usbh_hub_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs)
 {
     vk_usbh_hub_t *hub;
 
@@ -462,7 +467,7 @@ static void *vk_usbh_hub_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_
         ||  (desc_ifs->bNumEndpoints != 1)
         ||  ((desc_ep->bEndpointAddress & USB_DIR_MASK) != USB_DIR_IN)
         ||  ((desc_ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_INT)
-        ||  (NULL == (hub = VSF_USBH_MALLOC(sizeof(vk_usbh_hub_t))))) {
+        ||  (NULL == (hub = vsf_usbh_malloc(sizeof(vk_usbh_hub_t))))) {
         return NULL;
     }
 
@@ -471,23 +476,18 @@ static void *vk_usbh_hub_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_
     hub->dev = dev;
     hub->ifs = parser_ifs->ifs;
 
-    if (VSF_ERR_NONE != vsf_eda_set_evthandler( &(hub->teda.use_as__vsf_eda_t), 
-                                                vk_usbh_hub_evthandler)) {
-        VSF_USB_ASSERT(false);
-    }
-    //hub->teda.evthandler = vk_usbh_hub_evthandler;
-    
-    hub->teda.on_terminate = vk_usbh_hub_on_eda_terminate;
+    hub->teda.fn.evthandler = __vk_usbh_hub_evthandler;
+    hub->teda.on_terminate = __vk_usbh_hub_on_eda_terminate;
     vsf_teda_init(&hub->teda, vsf_prio_inherit, false);
 
     return hub;
 }
 
-static void vk_usbh_hub_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param)
+static void __vk_usbh_hub_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param)
 {
     vk_usbh_hub_t *hub = param;
 
-    __vsf_eda_fini(&hub->teda.use_as__vsf_eda_t);
+    vsf_eda_fini(&hub->teda.use_as__vsf_eda_t);
 }
 
 bool vk_usbh_hub_is_dev_resetting(vk_usbh_dev_t *dev)
@@ -497,7 +497,7 @@ bool vk_usbh_hub_is_dev_resetting(vk_usbh_dev_t *dev)
     VSF_USB_ASSERT(dev != NULL);
     dev_hub = dev->dev_parent;
     if (dev_hub != NULL) {
-        vk_usbh_hub_t *hub = hub_dev_gethub(dev_hub);
+        vk_usbh_hub_t *hub = __vk_usbh_hub_dev_gethub(dev_hub);
         return (hub->reset_mask & (1 << dev->index)) != 0;
     }
     return false;
@@ -510,15 +510,14 @@ vsf_err_t vk_usbh_hub_reset_dev(vk_usbh_dev_t *dev)
     VSF_USB_ASSERT(dev != NULL);
     dev_hub = dev->dev_parent;
     if (dev_hub != NULL) {
-        vk_usbh_hub_t *hub = hub_dev_gethub(dev_hub);
+        vk_usbh_hub_t *hub = __vk_usbh_hub_dev_gethub(dev_hub);
         uint_fast8_t index = dev->index;
 
         if (!(hub->reset_mask & (1 << index))) {
             hub->reset_mask |= (1 << index);
             __vsf_sched_safe(
                 if (hub->is_waiting_next_round) {
-                    vsf_teda_cancel_timer(&hub->teda);
-                    vsf_eda_post_evt(&hub->teda.use_as__vsf_eda_t, VSF_EVT_TIMER);
+                    vsf_eda_post_evt(&hub->teda.use_as__vsf_eda_t, VSF_EVT_USER);
                 } else {
                     hub->is_go_on_next_round = true;
                 }

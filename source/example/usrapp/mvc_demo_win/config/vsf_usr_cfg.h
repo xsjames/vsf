@@ -16,7 +16,7 @@
  ****************************************************************************/
 
 
-//! \note Top Level Application Configuration 
+//! \note Top Level Application Configuration
 
 #ifndef __TOP_APP_CFG_H__
 #define __TOP_APP_CFG_H__
@@ -24,7 +24,11 @@
 /*============================ INCLUDES ======================================*/
 /*============================ MACROS ========================================*/
 
-#define ASSERT(...)                     if (!(__VA_ARGS__)) {while(1);};
+#ifdef __WIN__
+#   define ASSERT(...)                   assert(__VA_ARGS__)
+#else
+#   define ASSERT(...)                   if (!(__VA_ARGS__)) {while(1);};
+#endif
 //#define ASSERT(...)
 
 #define VSF_HEAP_CFG_MCB_MAGIC_EN       ENABLED
@@ -52,7 +56,7 @@
 
 //          <o>The number of preemptive priorities <1-4>
 //          <i>Simon, please add description here...
-#define VSF_OS_CFG_PRIORITY_NUM                 1
+//#define VSF_OS_CFG_PRIORITY_NUM                 1
 //      </h>
 
 //      <o>The default eda stack frame pool size <1-65535>
@@ -71,10 +75,10 @@
 #define VSF_KERNEL_CFG_SUPPORT_SYNC                     ENABLED
 //      </c>
 
-//      <h> Schedule Policy 
+//      <h> Schedule Policy
 //          <c1>Enable Preemption
 //          <i>Simon, please add description here...
-#define VSF_KERNEL_CFG_SUPPORT_PREMPT                   ENABLED
+#define VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED     ENABLED
 //          </c>
 
 //          <c1>Enable Dynamic Task Priority
@@ -115,7 +119,7 @@
 //#define VSF_OS_CFG_MAIN_STACK_SIZE                    2048
 
 //          <c1>Run main as a thread
-//          <i>This feature will run main function as a thread. RTOS thread support must be enabled. 
+//          <i>This feature will run main function as a thread. RTOS thread support must be enabled.
 #define VSF_OS_CFG_MAIN_MODE                            VSF_OS_CFG_MAIN_MODE_IDLE
 //          </c>
 //      </h>
@@ -128,7 +132,7 @@
 
 //      <h> Task Form Configuration
 //          <c1>Enable the VSF Co-oprative task support
-//          <i>Enable this feature will provide cooperative task support, the task can be written as RTOS, PT and etc. The stack is shared and the call depth will be constant. 
+//          <i>Enable this feature will provide cooperative task support, the task can be written as RTOS, PT and etc. The stack is shared and the call depth will be constant.
 #define VSF_KERNEL_CFG_EDA_SUPPORT_FSM                  ENABLED
 //          </c>
 //          <c1>Enable the RTOS thread support
@@ -143,34 +147,13 @@
 //  </h>
 //! @}
 
+#define VSF_HAL_USE_DEBUG_STREAM                        ENABLED
 #define VSF_USE_INPUT                                   ENABLED
 
 #define VSF_USE_TRACE                                   ENABLED
 #define VSF_TRACE_CFG_COLOR_EN                          ENABLED
 
-#define VSF_USE_UI                                      ENABLED
-#   define VSF_USE_UI_LVGL                              DISABLED
-#   define VSF_USE_DISP_DRV_SDL2                        ENABLED
-
-#   define VSF_USE_TINY_GUI                             ENABLED
-#       define VSF_TGUI_CFG_RENDERING_TEMPLATE_SEL      VSF_TGUI_V_TEMPLATE_SIMPLE_VIEW
-#       define VSF_TGUI_CFG_COLOR_MODE                  VSF_TGUI_COLOR_ARGB_8888
-#       define VSF_TGUI_CFG_SUPPORT_NAME_STRING         ENABLED         /* Enabled for debug */
-
-#       define VSF_TGUI_CFG_SV_BUTTON_ADDITIONAL_TILES  ENABLED
-#       define VSF_TGUI_CFG_SV_BUTTON_BACKGROUND_COLOR  VSF_TGUI_COLOR_DEF(0xB4, 0xC7, 0xE7)
-#       define VSF_TGUI_SV_CFG_PANEL_ADDITIONAL_TILES   ENABLED
-#       define VSF_TGUI_SV_CFG_PANEL_BACKGROUND_COLOR   VSF_TGUI_COLOR_DEF(0x44, 0x72, 0xC4)
-#       define VSF_TGUI_CFG_SV_LABEL_ADDITIONAL_TILES   ENABLED
-#       define VSF_TGUI_CFG_SV_LABEL_BACKGROUND_COLOR   VSF_TGUI_COLOR_DEF(0xB4, 0xC7, 0xE7)
-
-#       define VSF_TGUI_LOG                             vsf_trace
-
-#   define VSF_USE_MSG_TREE                             ENABLED
-#       define VSF_MSG_TREE_CFG_SUPPORT_NAME_STRING     ENABLED         /* Enabled for debug */
-#       define VSF_MSGT_NODE_OFFSET_TYPE                int8_t
-
-#define VSF_USE_PBUF                                    DISABLED
+#define VSF_USE_PBUF                                    ENABLED
 #define VSF_PBUF_CFG_INDIRECT_RW_SUPPORT                DISABLED
 #define VSF_PBUF_CFG_SUPPORT_REF_COUNTING               DISABLED
 
@@ -181,10 +164,11 @@
 //#define GENERAL_PBUF_POOL_BLOCK_COUNT                   16
 #define GENERAL_PBUF_POLL_PRIV_USER_COUNT               2
 
-#define VSF_USE_SERVICE_STREAM                          DISABLED
-#define VSF_USE_SERVICE_VSFSTREAM                       ENABLED
+#define VSF_USE_STREAM                                  DISABLED
+#define VSF_USE_SIMPLE_STREAM                           ENABLED
+#define VSF_USE_FIFO                                    ENABLED
 
-#if VSF_USE_SERVICE_STREAM == ENABLED
+#if VSF_USE_STREAM == ENABLED
 
 /* \note uncomment this part to add dedicated pbuf pool
 enum {
@@ -213,68 +197,20 @@ enum {
  * Regarget Weak interface                                                    *
  *----------------------------------------------------------------------------*/
 
-#define WEAK_VSF_KERNEL_ERR_REPORT_EXTERN                                       \
-        extern void vsf_kernel_err_report(vsf_kernel_error_t err);
-#define WEAK_VSF_KERNEL_ERR_REPORT(__ERR)                                       \
-        vsf_kernel_err_report(__ERR)
+#define WEAK_VSF_KERNEL_ERR_REPORT
+#define WEAK___POST_VSF_KERNEL_INIT
+#define WEAK_VSF_SYSTIMER_EVTHANDLER
+#define WEAK_VSF_ARCH_REQ___SYSTIMER_RESOLUTION___FROM_USR
+#define WEAK_VSF_ARCH_REQ___SYSTIMER_FREQ___FROM_USR
+#define WEAK_VSF_DRIVER_INIT
+#define WEAK_VSF_HEAP_MALLOC_ALIGNED
 
-#define WEAK___POST_VSF_KERNEL_INIT_EXTERN                                      \
-        extern void __post_vsf_kernel_init(void);
-#define WEAK___POST_VSF_KERNEL_INIT()                                           \
-        __post_vsf_kernel_init()
+/*============================ TYPES =========================================*/
+/*============================ GLOBAL VARIABLES ==============================*/
+/*============================ LOCAL VARIABLES ===============================*/
+/*============================ PROTOTYPES ====================================*/
 
-#define WEAK_VSF_SYSTIMER_EVTHANDLER_EXTERN                                     \
-        extern void vsf_systimer_evthandler(vsf_systimer_cnt_t tick);
-#define WEAK_VSF_SYSTIMER_EVTHANDLER(__TICK)                                    \
-        vsf_systimer_evthandler(__TICK)
-
-#define WEAK_VSF_ARCH_REQ___SYSTIMER_RESOLUTION___FROM_USR_EXTERN               \
-        extern uint_fast32_t vsf_arch_req___systimer_resolution___from_usr(void);
-#define WEAK_VSF_ARCH_REQ___SYSTIMER_RESOLUTION___FROM_USR()                    \
-        vsf_arch_req___systimer_resolution___from_usr()
-
-#define WEAK_VSF_ARCH_REQ___SYSTIMER_FREQ___FROM_USR_EXTERN                     \
-        extern uint_fast32_t vsf_arch_req___systimer_freq___from_usr(void);
-#define WEAK_VSF_ARCH_REQ___SYSTIMER_FREQ___FROM_USR()                          \
-        vsf_arch_req___systimer_freq___from_usr()
-
-#define WEAK_VSF_DRIVER_INIT_EXTERN                                             \
-        bool vsf_driver_init(void);
-#define WEAK_VSF_DRIVER_INIT()                                                  \
-        vsf_driver_init()
-
-
-
-
-#if VSF_USE_UI == ENABLED && VSF_USE_TINY_GUI == ENABLED
-#   define WEAK_VSF_INPUT_ON_TOUCHSCREEN_EXTERN                                 \
-        extern void vsf_input_on_touchscreen(vk_touchscreen_evt_t *ts_evt);
-#   define WEAK_VSF_INPUT_ON_TOUCHSCREEN(__TS_EVT)                              \
-        vsf_input_on_touchscreen((__TS_EVT))
-#endif
-
-
-
-#define WEAK_VSF_HEAP_MALLOC_ALIGNED_EXTERN                                     \
-        extern void * vsf_heap_malloc_aligned(uint_fast32_t size, uint_fast32_t alignment);
-#define WEAK_VSF_HEAP_MALLOC_ALIGNED(__SIZE, __ALIGNMENT)                       \
-        vsf_heap_malloc_aligned((__SIZE), (__ALIGNMENT))
-
-#define WEAK_VSF_TGUI_IDX_ROOT_TILE_GET_SIZE_EXTERN                             \
-        extern vsf_tgui_size_t vsf_tgui_sdl_idx_root_tile_get_size(const vsf_tgui_tile_t* ptTile);
-#define WEAK_VSF_TGUI_IDX_ROOT_TILE_GET_SIZE(__PTTILE)                          \
-        vsf_tgui_sdl_idx_root_tile_get_size(__PTTILE)
-
-#define WEAK_VSF_TGUI_FONT_GET_DEFAULT_EXTERN                                   \
-        extern const vsf_tgui_font_t* vsf_tgui_sdl_font_get_default(void);
-#define WEAK_VSF_TGUI_FONT_GET_DEFAULT(__PTTILE)                          \
-        vsf_tgui_sdl_font_get_default(__PTTILE)
-
- /*============================ TYPES =========================================*/
- /*============================ GLOBAL VARIABLES ==============================*/
- /*============================ LOCAL VARIABLES ===============================*/
- /*============================ PROTOTYPES ====================================*/
-
-
+/*============================ INCLUDES ======================================*/
+#include "vsf_tgui_cfg.h"
 #endif
 /* EOF */

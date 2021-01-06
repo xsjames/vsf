@@ -21,11 +21,18 @@
 
 #if VSF_USE_LINUX == ENABLED
 
-#include <stdio.h>
-#include <unistd.h>
-#include <semaphore.h>
-
-#include "../../vsf_linux.h"
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED
+#   include "../../include/unistd.h"
+#   include "../../include/semaphore.h"
+#else
+#   include <unistd.h>
+#   include <semaphore.h>
+#endif
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED && VSF_LINUX_USE_SIMPLE_STDIO == ENABLED
+#   include "../../include/simple_libc/stdio.h"
+#else
+#   include <stdio.h>
+#endif
 
 /*============================ MACROS ========================================*/
 
@@ -77,6 +84,7 @@ int sem_trywait(sem_t *sem)
     return 0;
 }
 
+#if VSF_KERNEL_CFG_EDA_SUPPORT_TIMER == ENABLED
 int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout)
 {
     int_fast32_t timeout_us = abs_timeout->tv_sec * 1000000 + abs_timeout->tv_nsec / 1000;
@@ -85,5 +93,6 @@ int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout)
     }
     return 0;
 }
+#endif
 
 #endif      // VSF_USE_LINUX

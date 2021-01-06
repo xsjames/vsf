@@ -1,5 +1,5 @@
 /*****************************************************************************
- *   Copyright(C)2009-2019 by VSF Team                                       *
+ *   Copyright(C)2009-2020 by VSF Team                                       *
  *                                                                           *
  *  Licensed under the Apache License, Version 2.0 (the "License");          *
  *  you may not use this file except in compliance with the License.         *
@@ -15,15 +15,10 @@
  *                                                                           *
  ****************************************************************************/
 
-#ifndef __USE_X86_COMPILER_H__
-#define __USE_X86_COMPILER_H__
+#ifndef __USE_X86_COMPILER_H_PART_1__
+#define __USE_X86_COMPILER_H_PART_1__
 
 /*============================ INCLUDES ======================================*/
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
 
 //! \name The macros to identify the compiler
 //! @{
@@ -47,35 +42,33 @@
 #endif
 //! @}
 
+#endif /* end of __USE_X86_COMPILER_H_PART_1__ */
+
+
+/*========================== Multiple-Entry Start ============================*/
 
 #include "./type.h"
 #include "../__common/__compiler.h"
 
+/*========================== Multiple-Entry End ==============================*/
+
+#ifndef __USE_X86_COMPILER_H_PART_2__
+#define __USE_X86_COMPILER_H_PART_2__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* -----------------  Start of section using anonymous unions  -------------- */
+
+/*! \note it's safe to ignore -Wcast-align in x86 platform */
 #if __IS_COMPILER_LLVM__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-declarations"
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#pragma clang diagnostic ignored "-Wmicrosoft-anon-tag"
-#pragma clang diagnostic ignored "-Wmissing-braces"
-#pragma clang diagnostic ignored "-Wconstant-conversion"
+#   pragma clang diagnostic ignored "-Wcast-align"
 #elif __IS_COMPILER_GCC__
-#else
-  #warning Not supported compiler type
+#   pragma GCC diagnostic ignored "-Wcast-align"
 #endif
 
 /*============================ MACROS ========================================*/
-
-/*----------------------------------------------------------------------------*
- * Signal & Interrupt Definition                                              *
- *----------------------------------------------------------------------------*/
-
-typedef volatile bool vsf_gint_state_t;
-
-#define DISABLE_GLOBAL_INTERRUPT()			vsf_disable_interrupt()
-#define ENABLE_GLOBAL_INTERRUPT()			vsf_enable_interrupt()
-#define GET_GLOBAL_INTERRUPT_STATE()		vsf_get_interrupt()
-#define SET_GLOBAL_INTERRUPT_STATE(__STATE) vsf_set_interrupt((vsf_gint_state_t)__STATE)
 
 /*----------------------------------------------------------------------------*
  * Startup Source Code                                                        *
@@ -84,19 +77,10 @@ typedef volatile bool vsf_gint_state_t;
 #define vsf_stdio_init(...)
 
 /*============================ TYPES =========================================*/
-/*============================ INCLUDES ======================================*/
-
-//! \brief for interrupt 
-#include "./signal.h"
-
 /*============================ PROTOTYPES ====================================*/
 
-extern vsf_gint_state_t vsf_get_interrupt(void);
-
-extern void vsf_set_interrupt(vsf_gint_state_t level);
-
-extern vsf_gint_state_t vsf_disable_interrupt(void);
-
-extern void vsf_enable_interrupt(void);
-
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* end of __USE_X86_COMPILER_H_PART_2__ */

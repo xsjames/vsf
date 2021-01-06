@@ -89,7 +89,7 @@ struct usrapp_t {
         vk_mal_scsi_t mal_scsi;
     } scsi;
 
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+#if VSF_USE_SIMPLE_STREAM == ENABLED
     struct {
         uint8_t buffer[1024];
         vsf_mem_stream_t mem_stream;
@@ -168,8 +168,8 @@ static usrapp_t __usrapp = {
         .mem_mal                = {
             .drv                = &VK_MEM_MAL_DRV,
             .mem                = {
-                .pchBuffer      = __usrapp.scsi.mem,
-                .nSize          = sizeof(__usrapp.scsi.mem),
+                .buffer         = __usrapp.scsi.mem,
+                .size           = sizeof(__usrapp.scsi.mem),
             },
             .blksz              = 512,
         },
@@ -186,33 +186,33 @@ static usrapp_t __usrapp = {
         },
     },
 
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+#if VSF_USE_SIMPLE_STREAM == ENABLED
     .stream                     = {
         .mem_stream             = {
             .op                 = &vsf_mem_stream_op,
-            .pchBuffer          = __usrapp.stream.buffer,
-            .nSize              = sizeof(__usrapp.stream.buffer),
+            .buffer             = __usrapp.stream.buffer,
+            .size               = sizeof(__usrapp.stream.buffer),
         },
     },
 #endif
 };
 
-/*============================ IMPLEMENTATION ================================*/
-
-implement_usbd(user_usbd, APP_CFG_USBD_PID, APP_CFG_USBD_VID, 0x0409, USRAPP_CFG_USBD_DC_SPEED)
-    implement_usbd_common_desc(user_usbd, u"VSF-MSC", u"SimonQian", u"1.0.0", 64, USB_DESC_MSCBOT_IAD_LEN, USB_MSCBOT_IFS_NUM, USB_CONFIG_ATT_WAKEUP, 100)
-        implement_mscbot_desc(user_usbd, 0, 0, 1, 1, USRAPP_CFG_USBD_DC_EPSIZE)
-    implement_usbd_func_desc(user_usbd)
-        implement_usbd_func_str_desc(user_usbd, 0, u"VSF-MSC")
-    implement_usbd_std_desc_table(user_usbd)
-        implement_usbd_func_str_desc_table(user_usbd, 0)
-    implement_usbd_device_func(user_usbd)
-        implement_mscbot_func(user_usbd, 0, 1, 1, 1,
+describe_usbd(user_usbd, APP_CFG_USBD_PID, APP_CFG_USBD_VID, USRAPP_CFG_USBD_DC_SPEED)
+    usbd_common_desc(user_usbd, u"VSF-MSC", u"SimonQian", u"1.0.0", 64, USB_DESC_MSCBOT_IAD_LEN, USB_MSCBOT_IFS_NUM, USB_CONFIG_ATT_WAKEUP, 100)
+        mscbot_desc(user_usbd, 0, 0, 1, 1, USRAPP_CFG_USBD_DC_EPSIZE)
+    usbd_func_desc(user_usbd)
+        usbd_func_str_desc(user_usbd, 0, u"VSF-MSC")
+    usbd_std_desc_table(user_usbd)
+        usbd_func_str_desc_table(user_usbd, 0)
+    usbd_func(user_usbd)
+        mscbot_func(user_usbd, 0, 1, 1, 1,
             &__usrapp.scsi.mal_scsi.use_as__vk_scsi_t,
             &__usrapp.stream.mem_stream.use_as__vsf_stream_t)
-    implement_usbd_device_ifs(user_usbd)
-        implement_mscbot_ifs(user_usbd, 0)
-end_implement_usbd(user_usbd, VSF_USB_DC0)
+    usbd_ifs(user_usbd)
+        mscbot_ifs(user_usbd, 0)
+end_describe_usbd(user_usbd, VSF_USB_DC0)
+
+/*============================ IMPLEMENTATION ================================*/
 
 static void __usrapp_on_timer(vsf_callback_timer_t *timer)
 {
@@ -222,7 +222,7 @@ static void __usrapp_on_timer(vsf_callback_timer_t *timer)
 int main(void)
 {
 #if VSF_USE_TRACE == ENABLED
-    vsf_trace_init(NULL);
+    vsf_trace_init((vsf_stream_t *)&VSF_DEBUG_STREAM_TX);
     vsf_stdio_init();
 #endif
 

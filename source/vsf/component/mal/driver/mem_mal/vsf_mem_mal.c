@@ -19,13 +19,13 @@
 
 #include "../../vsf_mal_cfg.h"
 
-#if VSF_USE_MAL == ENABLED && VSF_USE_MEM_MAL == ENABLED
+#if VSF_USE_MAL == ENABLED && VSF_MAL_USE_MEM_MAL == ENABLED
 
-#define VSF_MAL_INHERIT
-#define VSF_MEM_MAL_IMPLEMENT
+#define __VSF_MAL_CLASS_INHERIT__
+#define __VSF_MEM_MAL_CLASS_IMPLEMENT
 
-// TODO: use dedicated include
-#include "vsf.h"
+#include "../../vsf_mal.h"
+#include "./vsf_mem_mal.h"
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -34,21 +34,30 @@
 
 static uint_fast32_t __vk_mem_mal_blksz(vk_mal_t *mal, uint_fast64_t addr, uint_fast32_t size, vsf_mal_op_t op);
 static bool __vk_mem_mal_buffer(vk_mal_t *mal, uint_fast64_t addr, uint_fast32_t size, vsf_mal_op_t op, vsf_mem_t *mem);
-static void __vk_mem_mal_init(uintptr_t target, vsf_evt_t evt);
-static void __vk_mem_mal_fini(uintptr_t target, vsf_evt_t evt);
-static void __vk_mem_mal_read(uintptr_t target, vsf_evt_t evt);
-static void __vk_mem_mal_write(uintptr_t target, vsf_evt_t evt);
+dcl_vsf_peda_methods(static, __vk_mem_mal_init)
+dcl_vsf_peda_methods(static, __vk_mem_mal_fini)
+dcl_vsf_peda_methods(static, __vk_mem_mal_read)
+dcl_vsf_peda_methods(static, __vk_mem_mal_write)
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
-const i_mal_drv_t VK_MEM_MAL_DRV = {
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
+const vk_mal_drv_t vk_mem_mal_drv = {
     .blksz          = __vk_mem_mal_blksz,
     .buffer         = __vk_mem_mal_buffer,
-    .init           = __vk_mem_mal_init,
-    .fini           = __vk_mem_mal_fini,
-    .read           = __vk_mem_mal_read,
-    .write          = __vk_mem_mal_write,
+    .init           = (vsf_peda_evthandler_t)vsf_peda_func(__vk_mem_mal_init),
+    .fini           = (vsf_peda_evthandler_t)vsf_peda_func(__vk_mem_mal_fini),
+    .read           = (vsf_peda_evthandler_t)vsf_peda_func(__vk_mem_mal_read),
+    .write          = (vsf_peda_evthandler_t)vsf_peda_func(__vk_mem_mal_write),
 };
+
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#endif
 
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ IMPLEMENTATION ================================*/
@@ -62,65 +71,79 @@ static uint_fast32_t __vk_mem_mal_blksz(vk_mal_t *mal, uint_fast64_t addr, uint_
 static bool __vk_mem_mal_buffer(vk_mal_t *mal, uint_fast64_t addr, uint_fast32_t size, vsf_mal_op_t op, vsf_mem_t *mem)
 {
     vk_mem_mal_t *pthis = (vk_mem_mal_t *)mal;
-    mem->pchBuffer = &pthis->mem.pchBuffer[addr];
-    mem->nSize = size;
+    mem->buffer = &pthis->mem.buffer[addr];
+    mem->size = size;
     return true;
 }
 
-static void __vk_mem_mal_init(uintptr_t target, vsf_evt_t evt)
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-align"
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wcast-align"
+#endif
+
+__vsf_component_peda_ifs_entry(__vk_mem_mal_init, vk_mal_init)
 {
-    vk_mem_mal_t *pthis = (vk_mem_mal_t *)target;
+    vsf_peda_begin();
+    vk_mem_mal_t *pthis = (vk_mem_mal_t *)&vsf_this;
     VSF_MAL_ASSERT(pthis != NULL);
-    pthis->result.errcode = VSF_ERR_NONE;
-    pthis->result.size = 0;
-    vsf_eda_return();
+    vsf_eda_return(VSF_ERR_NONE);
+    vsf_peda_end();
 }
 
-static void __vk_mem_mal_fini(uintptr_t target, vsf_evt_t evt)
+__vsf_component_peda_ifs_entry(__vk_mem_mal_fini, vk_mal_fini)
 {
-    vk_mem_mal_t *pthis = (vk_mem_mal_t *)target;
+    vsf_peda_begin();
+    vk_mem_mal_t *pthis = (vk_mem_mal_t *)&vsf_this;
     VSF_MAL_ASSERT(pthis != NULL);
-    pthis->result.errcode = VSF_ERR_NONE;
-    pthis->result.size = 0;
-    vsf_eda_return();
+    vsf_eda_return(VSF_ERR_NONE);
+    vsf_peda_end();
 }
 
-static void __vk_mem_mal_read(uintptr_t target, vsf_evt_t evt)
+__vsf_component_peda_ifs_entry(__vk_mem_mal_read, vk_mal_read)
 {
-    vk_mem_mal_t *pthis = (vk_mem_mal_t *)target;
+    vsf_peda_begin();
+    vk_mem_mal_t *pthis = (vk_mem_mal_t *)&vsf_this;
     uint_fast64_t addr;
     uint_fast32_t size;
 
     VSF_MAL_ASSERT(pthis != NULL);
-    addr = pthis->args.addr;
-    size = pthis->args.size;
-    VSF_MAL_ASSERT((size > 0) && ((addr + size) <= pthis->mem.nSize));
+    addr = vsf_local.addr;
+    size = vsf_local.size;
+    VSF_MAL_ASSERT((size > 0) && ((addr + size) <= pthis->mem.size));
 
-    if (pthis->args.buff != &pthis->mem.pchBuffer[addr]) {
-        memcpy(pthis->args.buff, &pthis->mem.pchBuffer[addr], size);
+    if (vsf_local.buff != &pthis->mem.buffer[addr]) {
+        memcpy(vsf_local.buff, &pthis->mem.buffer[addr], size);
     }
-    pthis->result.errcode = VSF_ERR_NONE;
-    pthis->result.size = size;
-    vsf_eda_return();
+    vsf_eda_return(size);
+    vsf_peda_end();
 }
 
-static void __vk_mem_mal_write(uintptr_t target, vsf_evt_t evt)
+__vsf_component_peda_ifs_entry(__vk_mem_mal_write, vk_mal_write)
 {
-    vk_mem_mal_t *pthis = (vk_mem_mal_t *)target;
+    vsf_peda_begin();
+    vk_mem_mal_t *pthis = (vk_mem_mal_t *)&vsf_this;
     uint_fast64_t addr;
     uint_fast32_t size;
 
     VSF_MAL_ASSERT(pthis != NULL);
-    addr = pthis->args.addr;
-    size = pthis->args.size;
-    VSF_MAL_ASSERT((size > 0) && ((addr + size) <= pthis->mem.nSize));
+    addr = vsf_local.addr;
+    size = vsf_local.size;
+    VSF_MAL_ASSERT((size > 0) && ((addr + size) <= pthis->mem.size));
 
-    if (pthis->args.buff != &pthis->mem.pchBuffer[addr]) {
-        memcpy(&pthis->mem.pchBuffer[addr], pthis->args.buff, size);
+    if (vsf_local.buff != &pthis->mem.buffer[addr]) {
+        memcpy(&pthis->mem.buffer[addr], vsf_local.buff, size);
     }
-    pthis->result.errcode = VSF_ERR_NONE;
-    pthis->result.size = size;
-    vsf_eda_return();
+    vsf_eda_return(size);
+    vsf_peda_end();
 }
+
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic pop
+#endif
 
 #endif

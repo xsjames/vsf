@@ -71,7 +71,7 @@
 //      <h> Schedule Policy
 //          <c1>Enable Preemption
 //          <i>Simon, please add description here...
-#define VSF_KERNEL_CFG_SUPPORT_PREMPT                   ENABLED
+#define VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED                   ENABLED
 //          </c>
 
 //          <c1>Enable Dynamic Task Priority
@@ -141,15 +141,16 @@
 //! @}
 
 #define VSF_USE_FS                                      ENABLED
-#   define VSF_USE_MEMFS                                ENABLED
-#   define VSF_USE_FATFS                                ENABLED
+#   define VSF_FS_USE_MEMFS                             ENABLED
+#   define VSF_FS_USE_FATFS                             ENABLED
 
 #define VSF_USE_MAL                                     ENABLED
-#   define VSF_USE_MEM_MAL                              ENABLED
-#   define VSF_USE_FAKEFAT32_MAL                        ENABLED
+#   define VSF_MAL_USE_MEM_MAL                          ENABLED
+#   define VSF_MAL_USE_FAKEFAT32_MAL                    ENABLED
+#define USRAPP_CFG_FAKEFAT32                            ENABLED
 
 #define VSF_USE_SCSI                                    ENABLED
-//#   define VSF_USE_MAL_SCSI                             ENABLED
+//#   define VSF_SCSI_USE_MAL_SCSI                        ENABLED
 
 #define VSF_USE_USB_HOST                                ENABLED
 
@@ -176,10 +177,10 @@
 //#define GENERAL_PBUF_POOL_BLOCK_COUNT                   16
 #define GENERAL_PBUF_POLL_PRIV_USER_COUNT               2
 
-#define VSF_USE_SERVICE_STREAM                          DISABLED
-#define VSF_USE_SERVICE_VSFSTREAM                       ENABLED
+#define VSF_USE_STREAM                                  DISABLED
+#define VSF_USE_SIMPLE_STREAM                           ENABLED
 
-#if VSF_USE_SERVICE_STREAM == ENABLED
+#if VSF_USE_STREAM == ENABLED
 
 /* \note uncomment this part to add dedicated pbuf pool
 enum {
@@ -211,13 +212,14 @@ enum {
 #       define VSF_USE_DISP_DRV_USBD_UVC    ENABLED
 #   endif
 #   if VSF_USE_USB_HOST == ENABLED
-#       define VSF_USE_USB_HOST_HUB         ENABLED
-#       define VSF_USE_USB_HOST_HCD_OHCI    ENABLED
+#       define VSF_USBH_USE_HUB             ENABLED
+#       define VSF_USBH_USE_HCD_OHCI        ENABLED
 #       define VSF_USBH_CFG_EDA_PRIORITY    vsf_prio_8
 #   endif
 
 #   define VSF_HEAP_SIZE                    0x8000
 #elif   defined(__WIN__)
+#   define VSF_HAL_USE_DEBUG_STREAM         ENABLED
 #   define VSF_OS_CFG_PRIORITY_NUM          1
 #   define VSF_OS_CFG_ADD_EVTQ_TO_IDLE      ENABLED
 
@@ -234,13 +236,13 @@ enum {
 #   endif
 #   if VSF_USE_USB_HOST == ENABLED
 #       define VSF_USBH_CFG_ENABLE_ROOT_HUB DISABLED
-#       define VSF_USE_USB_HOST_HCD_LIBUSB  ENABLED
-#       define VSF_LIBUSB_HCD_CFG_DEV_NUM   1
-#       define VSF_LIBUSB_HCD_DEV0_VID      0x0781      // SanDisk
-#       define VSF_LIBUSB_HCD_DEV0_PID      0x5567
+#       define VSF_USBH_USE_HCD_WINUSB      ENABLED
+#       define VSF_WINUSB_HCD_CFG_DEV_NUM   1
+#       define VSF_WINUSB_HCD_DEV0_VID      0x0781      // SanDisk
+#       define VSF_WINUSB_HCD_DEV0_PID      0x5567
 #   endif
 
-#   define VSF_USE_WINFS                    ENABLED
+#   define VSF_FS_USE_WINFS                 ENABLED
 
 #   define VSF_HEAP_SIZE                    0x100000
 #   define VSF_HEAP_CFG_MCB_ALIGN_BIT       5

@@ -50,7 +50,7 @@ static void usrapp_one_tick_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
 
 static void usrapp_on_timer(vsf_callback_timer_t *timer)
 {
-    vsf_trace(VSF_TRACE_DEBUG, "heartbeat: [%lld]" VSF_TRACE_CFG_LINEEND, vsf_timer_get_tick());
+    vsf_trace_debug("heartbeat: [%lld]" VSF_TRACE_CFG_LINEEND, vsf_systimer_get_tick());
     vsf_callback_timer_add_ms(timer, 1000);
 }
 
@@ -61,7 +61,7 @@ static void one_tick_timer_callback(vsf_callback_timer_t *timer)
 
 int main(void)
 {
-    vsf_trace_init(NULL);
+    vsf_trace_init((vsf_stream_t *)&VSF_DEBUG_STREAM_TX);
 
     usrapp.poll_timer.on_timer = usrapp_on_timer;
     vsf_callback_timer_add_ms(&usrapp.poll_timer, 1000);

@@ -17,8 +17,11 @@
 
 /*============================ INCLUDES ======================================*/
 
-// TODO: use dedicated include
-#include "vsf.h"
+#include "component/vsf_component_cfg.h"
+
+#if VSF_USE_BTSTACK == ENABLED
+
+// TODO: check dependency
 
 #include "btstack_config.h"
 #include "btstack_debug.h"
@@ -75,7 +78,7 @@ static void hci_transport_h4_on_in(void *param)
 
     if (h4param->opened)
     {
-        if (VSFSTREAM_GET_FREE_SIZE(bufstream))
+        if (VSF_STREAM_GET_FREE_SIZE(bufstream))
             return;
 
         switch (h4param->rx.state)
@@ -134,7 +137,7 @@ static void hci_transport_h4_on_in(void *param)
         case HCI_RX_RECEIVED:
             return;
         }
-        VSFSTREAM_READ(bufstream, &buffer);
+        VSF_STREAM_READ(bufstream, &buffer);
     }
 }
 
@@ -146,7 +149,7 @@ static void hci_transport_h4_on_out(void *param)
 
     if (h4param->opened)
     {
-        if (VSFSTREAM_GET_DATA_SIZE(bufstream))
+        if (VSF_STREAM_GET_DATA_SIZE(bufstream))
             return;
         vsfsm_post_evt_pending(&h4param->sm, HCI_EVT_OUT);
     }
@@ -180,8 +183,8 @@ static struct vsfsm_state_t *hci_transport_h4_evt_handler(struct vsfsm_t *sm,
             stream->callback_rx.on_inout = hci_transport_h4_on_in;
 
             vsf_usart_stream_init(usart_stream);
-            vsfstream_connect_tx(usart_stream->stream_tx);
-            vsfstream_connect_rx(usart_stream->stream_rx);
+            vsf_stream_connect_tx(usart_stream->stream_tx);
+            vsf_stream_connect_rx(usart_stream->stream_rx);
         }
         break;
     case HCI_EVT_IN:
@@ -199,7 +202,7 @@ static struct vsfsm_state_t *hci_transport_h4_evt_handler(struct vsfsm_t *sm,
     case HCI_EVT_OUT:
         bufstream = &h4param->tx.stream;
         if (bufstream->mem.buffer.size == 1)
-            VSFSTREAM_WRITE(bufstream, &h4param->tx.buffer);
+            VSF_STREAM_WRITE(bufstream, &h4param->tx.buffer);
         else
         {
             const uint8_t event[] = {HCI_EVENT_TRANSPORT_PACKET_SENT, 0};
@@ -250,7 +253,7 @@ static int hci_transport_h4_send_packet(uint8_t packet_type, uint8_t *packet,
 
         buffer.buffer = (uint8_t *)&hci_transport_h4_param.tx.type;
         buffer.size = 1;
-        VSFSTREAM_WRITE(stream, &buffer);
+        VSF_STREAM_WRITE(stream, &buffer);
         return 0;
     }
     return -1;
@@ -291,3 +294,4 @@ const hci_transport_t * hci_transport_h4_instance(
     return &hci_transport_h4;
 }
 
+#endif      // VSF_USE_BTSTACK

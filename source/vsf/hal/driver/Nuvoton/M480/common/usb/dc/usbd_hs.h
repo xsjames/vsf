@@ -35,7 +35,7 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct m480_usbd_hs_const_t {
+typedef struct m480_usbd_hs_const_t {
 #ifdef M480_USBD_HS_WROKAROUND_ISO
     // information from lv0
     uint16_t *tx_size;
@@ -46,12 +46,11 @@ struct m480_usbd_hs_const_t {
     uint8_t ep_num;
     m480_usbphy_t phy;
     IRQn_Type irq;
-    pm_ahb_clk_no_t ahbclk;
+    pm_sclk_no_t sclk;
     HSUSBD_T *reg;
-};
-typedef struct m480_usbd_hs_const_t m480_usbd_hs_const_t;
+} m480_usbd_hs_const_t;
 
-struct m480_usbd_hs_t {
+typedef struct m480_usbd_hs_t {
     uint16_t ep_buf_ptr;
 #ifdef M480_USBD_HS_WROKAROUND_ISO
     uint16_t ep_tx_mask;
@@ -62,8 +61,7 @@ struct m480_usbd_hs_t {
         void *param;
     } callback;
     const m480_usbd_hs_const_t *param;
-};
-typedef struct m480_usbd_hs_t m480_usbd_hs_t;
+} m480_usbd_hs_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ INCLUDES ======================================*/
@@ -86,7 +84,7 @@ extern uint_fast8_t m480_usbd_hs_get_mframe_number(m480_usbd_hs_t *usbd_hs);
 extern void m480_usbd_hs_get_setup(m480_usbd_hs_t *usbd_hs, uint8_t *buffer);
 extern void m480_usbd_hs_status_stage(m480_usbd_hs_t *usbd_hs, bool is_in);
 
-extern uint_fast8_t m480_usbd_hs_ep_get_feature(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep);
+extern uint_fast8_t m480_usbd_hs_ep_get_feature(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep, uint_fast8_t feature);
 extern vsf_err_t m480_usbd_hs_ep_add(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep, usb_ep_type_t type, uint_fast16_t size);
 extern uint_fast16_t m480_usbd_hs_ep_get_size(m480_usbd_hs_t *usbd_hs, uint_fast8_t ep);
 

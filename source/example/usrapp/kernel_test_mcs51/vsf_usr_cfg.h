@@ -80,7 +80,7 @@
 //      <h> Schedule Policy 
 //          <c1>Enable Preemption
 //          <i>Simon, please add description here...
-#define VSF_KERNEL_CFG_SUPPORT_PREMPT           ENABLED
+#define VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED           ENABLED
 //          </c>
 
 //          <c1>Enable Dynamic Task Priority
@@ -161,8 +161,8 @@
 #define VSF_USE_TRACE                       ENABLED
 #   define VSF_TRACE_CFG_COLOR_EN           DISABLED
 
-#define VSF_USE_SERVICE_STREAM              DISABLED
-#define VSF_USE_SERVICE_VSFSTREAM           ENABLED
+#define VSF_USE_STREAM                      DISABLED
+#define VSF_USE_SIMPLE_STREAM               ENABLED
 
 /*============================ INCLUDES ======================================*/
 

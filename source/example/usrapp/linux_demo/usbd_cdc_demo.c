@@ -7,7 +7,7 @@
  *                                                                           *
  *     http://www.apache.org/licenses/LICENSE-2.0                            *
  *                                                                           *
- *  Unless requir by applicable law or agreed to in writing, software      *
+ *  Unless required by applicable law or agreed to in writing, software      *
  *  distributed under the License is distributed on an "AS IS" BASIS,        *
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *
  *  See the License for the specific language governing permissions and      *
@@ -77,20 +77,20 @@
             .stream.tx.stream   = (vsf_stream_t *)&__USBD.cdc[(__N)].stream.tx, \
             .stream.rx.stream   = (vsf_stream_t *)&__USBD.cdc[(__N)].stream.rx, \
         },                                                                      \
-        .stream             = {                                                 \
+        .stream                 = {                                             \
             .tx.op              = &vsf_mem_stream_op,                           \
-            .tx.pchBuffer       = (uint8_t *)&__USBD.cdc[(__N)].stream.tx_buffer,\
-            .tx.nSize           = sizeof(__USBD.cdc[(__N)].stream.tx_buffer),   \
+            .tx.buffer          = (uint8_t *)&__USBD.cdc[(__N)].stream.tx_buffer,\
+            .tx.size            = sizeof(__USBD.cdc[(__N)].stream.tx_buffer),   \
             .tx.align           = USRAPP_CFG_STREAM_ALIGN,                      \
             .rx.op              = &vsf_mem_stream_op,                           \
-            .rx.pchBuffer       = (uint8_t *)&__USBD.cdc[(__N)].stream.rx_buffer,\
-            .rx.nSize           = sizeof(__USBD.cdc[(__N)].stream.rx_buffer),   \
+            .rx.buffer          = (uint8_t *)&__USBD.cdc[(__N)].stream.rx_buffer,\
+            .rx.size            = sizeof(__USBD.cdc[(__N)].stream.rx_buffer),   \
             .rx.align           = USRAPP_CFG_STREAM_ALIGN,                      \
         },                                                                      \
     },                                                                          \
-    .ifs[2 * (__N)].class_op        = &vk_usbd_cdcacm_control,                 \
+    .ifs[2 * (__N)].class_op        = &vk_usbd_cdcacm_control,                  \
     .ifs[2 * (__N)].class_param     = &__USBD.cdc[(__N)].param,                 \
-    .ifs[2 * (__N) + 1].class_op    = &vk_usbd_cdcacm_data,                    \
+    .ifs[2 * (__N) + 1].class_op    = &vk_usbd_cdcacm_data,                     \
     .ifs[2 * (__N) + 1].class_param = &__USBD.cdc[(__N)].param,
 
 /*============================ TYPES =========================================*/
@@ -174,7 +174,7 @@ static const usrapp_usbd_cdc_const_t __usrapp_usbd_cdc_const = {
 #   endif
 #endif
         .dev_desc               = {
-            USB_DESC_DEV_IAD(64, APP_CFG_USBD_VID, APP_CFG_USBD_PID, 1, 2, 0, 1)
+            USB_DESC_DEV_IAD(0x0200, 64, APP_CFG_USBD_VID, APP_CFG_USBD_PID, 0x0100, 1, 2, 0, 1)
         },
         .config_desc            = {
             USB_DESC_CFG(sizeof(__usrapp_usbd_cdc_const.usbd.config_desc), 2 * USRAPP_CFG_CDC_NUM, 1, 0, 0x80, 100)
@@ -197,8 +197,8 @@ static const usrapp_usbd_cdc_const_t __usrapp_usbd_cdc_const = {
         },
         REPEAT_MACRO(USRAPP_CFG_CDC_NUM, USRAPP_DESC_CDC_STRING, NULL)
         .std_desc               = {
-            VSF_USBD_DESC_DEVICE(0, __usrapp_usbd_cdc_const.usbd.dev_desc, sizeof(__usrapp_usbd_cdc_const.usbd.dev_desc)),
-            VSF_USBD_DESC_CONFIG(0, 0, __usrapp_usbd_cdc_const.usbd.config_desc, sizeof(__usrapp_usbd_cdc_const.usbd.config_desc)),
+            VSF_USBD_DESC_DEVICE(__usrapp_usbd_cdc_const.usbd.dev_desc, sizeof(__usrapp_usbd_cdc_const.usbd.dev_desc)),
+            VSF_USBD_DESC_CONFIG(0, __usrapp_usbd_cdc_const.usbd.config_desc, sizeof(__usrapp_usbd_cdc_const.usbd.config_desc)),
             VSF_USBD_DESC_STRING(0, 0, __usrapp_usbd_cdc_const.usbd.str_lanid, sizeof(__usrapp_usbd_cdc_const.usbd.str_lanid)),
             VSF_USBD_DESC_STRING(0x0409, 1, __usrapp_usbd_cdc_const.usbd.str_vendor, sizeof(__usrapp_usbd_cdc_const.usbd.str_vendor)),
             VSF_USBD_DESC_STRING(0x0409, 2, __usrapp_usbd_cdc_const.usbd.str_product, sizeof(__usrapp_usbd_cdc_const.usbd.str_product)),

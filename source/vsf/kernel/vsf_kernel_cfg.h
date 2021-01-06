@@ -19,8 +19,7 @@
 #include "vsf_cfg.h"
 
 // for VSF_SWI_NUM and VSF_ARCH_PRI_NUM
-#define __VSF_HEADER_ONLY_SHOW_ARCH_INFO__
-#include "hal/vsf_hal.h"
+#include "hal/arch/vsf_arch.h"
 
 #ifndef __VSF_KERNAL_CFG_H__
 #define __VSF_KERNAL_CFG_H__
@@ -30,7 +29,7 @@
 /*============================ MACROS ========================================*/
 
 #ifndef VSF_KERNEL_ASSERT
-#   define VSF_KERNEL_ASSERT                    ASSERT
+#   define VSF_KERNEL_ASSERT                                ASSERT
 #endif
 
 
@@ -47,8 +46,18 @@
 #   ifndef VSF_KERNEL_CFG_SUPPORT_MSG_QUEUE
 #       define VSF_KERNEL_CFG_SUPPORT_MSG_QUEUE             ENABLED
 #   endif
+#else
+#   ifndef VSF_KERNEL_CFG_SUPPORT_BITMAP_EVENT
+#       define VSF_KERNEL_CFG_SUPPORT_BITMAP_EVENT          DISABLED
+#   endif
+#   ifndef VSF_KERNEL_CFG_SUPPORT_SYNC_IRQ
+#       define VSF_KERNEL_CFG_SUPPORT_SYNC_IRQ              DISABLED
+#   endif
 #endif
 
+
+#define VSF_KERNEL_CFG_TIMER_MODE_TICK                      0
+#define VSF_KERNEL_CFG_TIMER_MODE_TICKLESS                  1
 
 #ifndef VSF_KERNEL_CFG_EDA_SUPPORT_TIMER
 #   define VSF_KERNEL_CFG_EDA_SUPPORT_TIMER                 ENABLED
@@ -57,7 +66,13 @@
 #   ifndef VSF_KERNEL_CFG_CALLBACK_TIMER
 #       define VSF_KERNEL_CFG_CALLBACK_TIMER                ENABLED
 #   endif
+#   ifndef VSF_KERNEL_CFG_TIMER_MODE
+#       define VSF_KERNEL_CFG_TIMER_MODE                    VSF_KERNEL_CFG_TIMER_MODE_TICKLESS
+#   endif
 #else
+#   ifndef VSF_KERNEL_CFG_CALLBACK_TIMER
+#       define VSF_KERNEL_CFG_CALLBACK_TIMER                DISABLED
+#   endif
 #   if VSF_KERNEL_CFG_CALLBACK_TIMER == ENABLED
 #       warning "VSF_KERNEL_CFG_EDA_SUPPORT_TIMER MUST be enabled to use callback_timer"
 #       undef VSF_KERNEL_CFG_EDA_SUPPORT_TIMER
@@ -76,8 +91,13 @@
 
 #if VSF_KERNEL_CFG_EDA_SUPPORT_FSM == ENABLED
 #   if VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL != ENABLED
-#       warning "VSF_KERNEL_CFG_EDA_SUPPORT_FSM need VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL, enable by default"
-#       define VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL  ENABLED
+#       warning "Since VSF_KERNEL_CFG_EDA_SUPPORT_FSM is ENABLED \
+and it requires VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL also be set to \
+ENABLED, to allow the compilation continue, \
+VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL is forced to ENABLED. If this is \
+not what you want, please disable VSF_KERNEL_CFG_EDA_SUPPORT_FSM."
+#       undef VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL
+#       define VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL          ENABLED
 #   endif
 #endif
 
@@ -95,8 +115,8 @@
 #   define VSF_KERNEL_CFG_SUPPORT_THREAD                    ENABLED
 #endif
 
-#ifndef VSF_USE_KERNEL_SIMPLE_SHELL
-#   define VSF_USE_KERNEL_SIMPLE_SHELL                      ENABLED
+#ifndef VSF_KERNEL_USE_SIMPLE_SHELL
+#   define VSF_KERNEL_USE_SIMPLE_SHELL                      ENABLED
 #endif
 
 #ifndef VSF_KERNEL_CFG_EDA_SUPPORT_PT
@@ -104,18 +124,18 @@
 #endif
 
 #ifndef VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM
-#   define VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM            ENABLED
+#   define VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM            DISABLED
 #endif
 
 
 
-#define VSF_OS_CFG_MAIN_MODE_NONE               0
-#define VSF_OS_CFG_MAIN_MODE_THREAD             1
-#define VSF_OS_CFG_MAIN_MODE_EDA                2
-#define VSF_OS_CFG_MAIN_MODE_IDLE               3
-    
+#define VSF_OS_CFG_MAIN_MODE_NONE                           0
+#define VSF_OS_CFG_MAIN_MODE_THREAD                         1
+#define VSF_OS_CFG_MAIN_MODE_EDA                            2
+#define VSF_OS_CFG_MAIN_MODE_IDLE                           3
+
 #ifndef VSF_OS_CFG_MAIN_MODE
-#   define VSF_OS_CFG_MAIN_MODE                 VSF_OS_CFG_MAIN_MODE_THREAD
+#   define VSF_OS_CFG_MAIN_MODE                             VSF_OS_CFG_MAIN_MODE_THREAD
 #endif
 
 #if VSF_OS_CFG_MAIN_MODE == VSF_OS_CFG_MAIN_MODE_THREAD
@@ -142,27 +162,27 @@
 
 
 #ifndef VSF_USR_SWI_NUM
-#   define VSF_USR_SWI_NUM                      0
+#   define VSF_USR_SWI_NUM                                  0
 #endif
 #if     !defined(VSF_OS_CFG_PRIORITY_NUM) && !defined(__VSF_OS_SWI_NUM)
 #   if (VSF_SWI_NUM + VSF_USR_SWI_NUM) > VSF_ARCH_PRI_NUM
-#       define __VSF_OS_SWI_NUM             VSF_ARCH_PRI_NUM
+#       define __VSF_OS_SWI_NUM                             VSF_ARCH_PRI_NUM
 #   else
-#       define __VSF_OS_SWI_NUM             (VSF_SWI_NUM + VSF_USR_SWI_NUM)
+#       define __VSF_OS_SWI_NUM                             (VSF_SWI_NUM + VSF_USR_SWI_NUM)
 #   endif
 #   if VSF_OS_CFG_ADD_EVTQ_TO_IDLE == ENABLED
-#       define VSF_OS_CFG_PRIORITY_NUM      (__VSF_OS_SWI_NUM+1)
+#       define VSF_OS_CFG_PRIORITY_NUM                      (__VSF_OS_SWI_NUM + 1)
 #   else
-#       define VSF_OS_CFG_PRIORITY_NUM      __VSF_OS_SWI_NUM
+#       define VSF_OS_CFG_PRIORITY_NUM                      __VSF_OS_SWI_NUM
 #   endif
 #elif !defined(__VSF_OS_SWI_NUM)
 #   warning "VSF_OS_CFG_PRIORITY_NUM is defined while __VSF_OS_SWI_NUM is not \
 automatically calculated based on VSF_OS_CFG_PRIORITY_NUM in vsf_cfg.h. This \
 should not happen."
 #   if VSF_OS_CFG_ADD_EVTQ_TO_IDLE == ENABLED
-#       define __VSF_OS_SWI_NUM             (VSF_OS_CFG_PRIORITY_NUM-1)
+#       define __VSF_OS_SWI_NUM                             (VSF_OS_CFG_PRIORITY_NUM - 1)
 #   else
-#       define __VSF_OS_SWI_NUM             VSF_OS_CFG_PRIORITY_NUM
+#       define __VSF_OS_SWI_NUM                             VSF_OS_CFG_PRIORITY_NUM
 #   endif
 #elif !defined(VSF_OS_CFG_PRIORITY_NUM)
 #   warning "User should never define __VSF_OS_SWI_NUM which is ought to be \
@@ -170,53 +190,55 @@ calculated from macro VSF_OS_CFG_PRIORITY_NUM. Please define \
 VSF_OS_CFG_PRIORITY_NUM in your vsf_usr_cfg.h (or any configuration header file \
 included by vsf_usr_cfg.h)"
 #   if VSF_OS_CFG_ADD_EVTQ_TO_IDLE == ENABLED
-#       define VSF_OS_CFG_PRIORITY_NUM      (__VSF_OS_SWI_NUM+1)
+#       define VSF_OS_CFG_PRIORITY_NUM                      (__VSF_OS_SWI_NUM + 1)
 #   else
-#       define VSF_OS_CFG_PRIORITY_NUM      __VSF_OS_SWI_NUM
+#       define VSF_OS_CFG_PRIORITY_NUM                      __VSF_OS_SWI_NUM
 #   endif
 #endif
 
 
-#ifndef VSF_KERNEL_CFG_SUPPORT_PREMPT
-#   define VSF_KERNEL_CFG_SUPPORT_PREMPT                    ENABLED
+#ifndef VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED
+#   define VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED      ENABLED
 #endif
 #ifndef VSF_OS_CFG_ADD_EVTQ_TO_IDLE
 #   define VSF_OS_CFG_ADD_EVTQ_TO_IDLE                      DISABLED
 #endif
 
-#if __VSF_OS_SWI_NUM > (VSF_USR_SWI_NUM + VSF_SWI_NUM)
+#if     __VSF_OS_SWI_NUM > (VSF_USR_SWI_NUM + VSF_SWI_NUM)                      \
+    ||  VSF_OS_CFG_PRIORITY_NUM > (VSF_ARCH_PRI_NUM + 1)
 #   error "too many VSF_OS_CFG_PRIORITY_NUM!!!"
 #endif
 #if VSF_OS_CFG_PRIORITY_NUM <= 0
-#   error "VSF_OS_CFG_PRIORITY_NUM MUST be > 0"
+#   error "VSF_OS_CFG_PRIORITY_NUM MUST > 0"
 #endif
 
-#if __VSF_OS_SWI_NUM > 1 && VSF_KERNEL_CFG_SUPPORT_PREMPT != ENABLED
-#   warning "VSF_KERNEL_CFG_SUPPORT_PREMPT MUST be enabled to support           \
+#if __VSF_OS_SWI_NUM > 1 && VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED != ENABLED
+#   warning "VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED MUST be enabled to support           \
 VSF_OS_CFG_PRIORITY_NUM > 1"
-#   undef VSF_KERNEL_CFG_SUPPORT_PREMPT
-#   define VSF_KERNEL_CFG_SUPPORT_PREMPT                    ENABLED
+#   undef VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED
+#   define VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED      ENABLED
 #endif
 
 #if VSF_OS_CFG_ADD_EVTQ_TO_IDLE == ENABLED
-#   if VSF_KERNEL_CFG_SUPPORT_PREMPT != ENABLED
-#       warning "VSF_KERNEL_CFG_SUPPORT_PREMPT MUST be enabled to support       \
+#   if      VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED != ENABLED                            \
+        &&  VSF_OS_CFG_PRIORITY_NUM > 1
+#       warning "VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED MUST be enabled to support       \
 VSF_OS_CFG_ADD_EVTQ_TO_IDLE"
-#       undef VSF_KERNEL_CFG_SUPPORT_PREMPT
-#       define VSF_KERNEL_CFG_SUPPORT_PREMPT                ENABLED
+#       undef VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED
+#       define VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED  ENABLED
 #   endif
 
-/*! \note when VSF_OS_CFG_PRIORITY_NUM equals 1, no SWI is required, hence the 
+/*! \note when VSF_OS_CFG_PRIORITY_NUM equals 1, no SWI is required, hence the
           macro __VSF_OS_SWI_PRIORITY_BEGIN should **NOT** be defined.
 */
 #   if VSF_OS_CFG_PRIORITY_NUM > 1
-#       define __VSF_OS_SWI_PRIORITY_BEGIN      vsf_prio_1
+#       define __VSF_OS_SWI_PRIORITY_BEGIN                  vsf_prio_1
 #   endif
 #else
-#   define __VSF_OS_SWI_PRIORITY_BEGIN          vsf_prio_0
+#   define __VSF_OS_SWI_PRIORITY_BEGIN                      vsf_prio_0
 #endif
 
-#if VSF_KERNEL_CFG_SUPPORT_PREMPT == ENABLED
+#if VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED == ENABLED
 #   define __VSF_KERNEL_CFG_EVTQ_EN                         ENABLED
 
 #   ifndef VSF_KERNEL_CFG_SUPPORT_DYNAMIC_PRIOTIRY
@@ -249,31 +271,38 @@ VSF_OS_CFG_ADD_EVTQ_TO_IDLE"
 
 #if     !defined(VSF_KERNEL_CFG_THREAD_STACK_PAGE_SIZE)                         \
     &&  defined(VSF_ARCH_STACK_PAGE_SIZE)
-#   define VSF_KERNEL_CFG_THREAD_STACK_PAGE_SIZE        VSF_ARCH_STACK_PAGE_SIZE
+#   define VSF_KERNEL_CFG_THREAD_STACK_PAGE_SIZE            VSF_ARCH_STACK_PAGE_SIZE
 #endif
 
 #if     !defined(VSF_KERNEL_CFG_THREAD_STACK_GUARDIAN_SIZE)                     \
-    &&  defined(VSF_ARCH_STACK_GUARDIAN_SIZE)                               
-#   define VSF_KERNEL_CFG_THREAD_STACK_GUARDIAN_SIZE    VSF_ARCH_STACK_GUARDIAN_SIZE
+    &&  defined(VSF_ARCH_STACK_GUARDIAN_SIZE)
+#   define VSF_KERNEL_CFG_THREAD_STACK_GUARDIAN_SIZE        VSF_ARCH_STACK_GUARDIAN_SIZE
 #endif
 
 
 #ifndef VSF_KERNEL_CFG_FRAME_USER_BITS
-#   define VSF_KERNEL_CFG_FRAME_USER_BITS           6
+#   define VSF_KERNEL_CFG_FRAME_USER_BITS                   14
 #elif VSF_KERNEL_CFG_FRAME_USER_BITS <= 0
 #   undef VSF_KERNEL_CFG_FRAME_USER_BITS
-#   define VSF_KERNEL_CFG_FRAME_USER_BITS           6
+#   define VSF_KERNEL_CFG_FRAME_USER_BITS                   14
 #endif
 
 /*----------------------------------------------------------------------------*
  * Forced disabled features/modules when C89/90 is used                       *
  *----------------------------------------------------------------------------*/
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L
-#   undef VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM
-#   define VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM            DISABLED
 
-#   undef VSF_KERNEL_CFG_SUPPORT_THREAD
-#   define VSF_KERNEL_CFG_SUPPORT_THREAD                    DISABLED
+#   if VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM == ENABLED
+#       warning VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM need c99
+#       undef VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM
+#       define VSF_KERNEL_CFG_EDA_SUPPORT_SIMPLE_FSM        DISABLED
+#   endif
+
+#   if VSF_KERNEL_CFG_SUPPORT_THREAD == ENABLED
+#       warning VSF_KERNEL_CFG_SUPPORT_THREAD need c99
+#       undef VSF_KERNEL_CFG_SUPPORT_THREAD
+#       define VSF_KERNEL_CFG_SUPPORT_THREAD                DISABLED
+#   endif
 #endif
 
 

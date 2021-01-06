@@ -23,6 +23,15 @@
 #define __VSF_INPUT_CFG_H__
 
 /*============================ MACROS ========================================*/
+
+#ifndef VSF_INPUT_ASSERT
+#   define VSF_INPUT_ASSERT                         ASSERT
+#endif
+
+#ifndef VSF_INPUT_CFG_REGISTRATION_MECHANISM
+#   define VSF_INPUT_CFG_REGISTRATION_MECHANISM     ENABLED
+#endif
+
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/

@@ -21,6 +21,13 @@
 #define __VSF_USB_HUB_H__
 
 /*============================ INCLUDES ======================================*/
+
+#include "utilities/vsf_utilities.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*============================ MACROS ========================================*/
 
 #ifndef USB_MAXCHILDREN
@@ -30,6 +37,7 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
+typedef struct usb_hub_desc_t usb_hub_desc_t;
 struct usb_hub_desc_t {
     uint8_t  bDescLength;
     uint8_t  bDescriptorType;
@@ -44,22 +52,21 @@ struct usb_hub_desc_t {
             /* add 1 bit for hub status change; round to bytes */
             uint8_t  DeviceRemovable[(USB_MAXCHILDREN + 1 + 7) / 8];
             uint8_t  PortPwrCtrlMask[(USB_MAXCHILDREN + 1 + 7) / 8];
-        } hs PACKED;
+        } PACKED hs;
 
         struct {
             uint8_t bHubHdrDecLat;
             uint16_t wHubDelay;
             uint16_t DeviceRemovable;
-        } ss PACKED;
-    } u PACKED;
+        } PACKED ss;
+    } PACKED u;
 } PACKED;
-typedef struct usb_hub_desc_t usb_hub_desc_t;
 
+typedef struct usb_port_status_t usb_port_status_t;
 struct usb_port_status_t {
     uint16_t wPortStatus;
     uint16_t wPortChange;
 } PACKED;
-typedef struct usb_port_status_t usb_port_status_t;
 
 enum usb_port_feature_t {
     USB_PORT_FEAT_CONNECTION        = 0,
@@ -105,5 +112,9 @@ enum usb_port_change_t {
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ PROTOTYPES ====================================*/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif    // __VSF_USB_HUB_H__

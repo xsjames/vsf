@@ -22,16 +22,20 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if 	(VSF_USE_USB_DEVICE == ENABLED && VSF_USE_USB_DEVICE_DCD_DWCOTG == ENABLED)\
-	||	(VSF_USE_USB_HOST == ENABLED && VSF_USE_USB_HOST_HCD_DWCOTG == ENABLED)
+#if 	(VSF_USE_USB_DEVICE == ENABLED && VSF_USBD_USE_DCD_DWCOTG == ENABLED)   \
+	||	(VSF_USE_USB_HOST == ENABLED && VSF_USBH_USE_HCD_DWCOTG == ENABLED)
 
 #include "./dwcotg_regs.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct vsf_dwcotg_hw_info_t {
+typedef struct vk_dwcotg_hw_info_t {
     uint16_t buffer_word_size;
     union {
         struct {
@@ -43,12 +47,15 @@ struct vsf_dwcotg_hw_info_t {
         };
         uint8_t feature;
     };
-};
-typedef struct vsf_dwcotg_hw_info_t vsf_dwcotg_hw_info_t;
+} vk_dwcotg_hw_info_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ INCLUDES ======================================*/
 /*============================ PROTOTYPES ====================================*/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 #endif

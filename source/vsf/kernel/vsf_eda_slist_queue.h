@@ -23,15 +23,19 @@
 
 #if VSF_USE_KERNEL == ENABLED
 
-#if     defined(__VSF_QUEUE_CLASS_IMPLEMENT)
-#   undef __VSF_QUEUE_CLASS_IMPLEMENT
-#   define __PLOOC_CLASS_IMPLEMENT
-#elif   defined(__VSF_QUEUE_CLASS_INHERIT)
-#   undef __VSF_QUEUE_CLASS_INHERIT
-#   define __PLOOC_CLASS_INHERIT
+#if     defined(__VSF_EDA_SLIST_QUEUE_CLASS_IMPLEMENT)
+#   undef __VSF_EDA_SLIST_QUEUE_CLASS_IMPLEMENT
+#   define __PLOOC_CLASS_IMPLEMENT__
+#elif   defined(__VSF_EDA_SLIST_QUEUE_CLASS_INHERIT__)
+#   undef __VSF_EDA_SLIST_QUEUE_CLASS_INHERIT__
+#   define __PLOOC_CLASS_INHERIT__
 #endif
 
 #include "utilities/ooc_class.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 
@@ -56,7 +60,7 @@
 
 #if __VSF_KERNEL_CFG_SUPPORT_EDA_SLIST_QUEUE == ENABLED
 
-declare_simple_class(vsf_eda_slist_queue_t)
+dcl_simple_class(vsf_eda_slist_queue_t)
 
 def_simple_class(vsf_eda_slist_queue_t) {
     public_member(
@@ -73,7 +77,11 @@ def_simple_class(vsf_eda_slist_queue_t) {
 /*============================ PROTOTYPES ====================================*/
 
 #if __VSF_KERNEL_CFG_SUPPORT_EDA_SLIST_QUEUE == ENABLED
-extern vsf_err_t vsf_eda_slist_queue_init(vsf_eda_slist_queue_t *pthis, uint_fast16_t max);
+extern vsf_err_t vsf_eda_slist_queue_init(vsf_eda_slist_queue_t *this_ptr, uint_fast16_t max);
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

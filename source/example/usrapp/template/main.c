@@ -42,7 +42,7 @@ def_vsf_thread(user_task_t, 1024,
     
     def_params(
 #if VSF_KERNEL_CFG_SUPPORT_SYNC
-        vsf_sem_t *psem;
+        vsf_sem_t *sem_ptr;
 #endif
     ));
 #endif
@@ -150,11 +150,11 @@ static NO_INIT user_grouped_evts_t __user_grouped_evts;
 
 #if VSF_KERNEL_CFG_EDA_SUPPORT_TIMER == ENABLED
 
-static implement_vsf_task(timer_example_t)
+implement_vsf_task(timer_example_t)
 {
     vsf_task_begin();
     
-    int index = (timer_example_t *)ptThis - __timer_example;
+    int index = (timer_example_t *)this_ptr - __timer_example;
     int delay = 2000 * (1 + index);
 
 	switch (evt) {
@@ -176,12 +176,12 @@ static implement_vsf_task(timer_example_t)
 
 
 
-static void __code_region_example_on_enter(void *pObj, void *pLocal)
+static void __code_region_example_on_enter(void *obj_ptr, void *pLocal)
 {
     printf("-------enter-------\r\n");
 }
 
-static void __code_region_example_on_leave(void *pObj,void *pLocal)
+static void __code_region_example_on_leave(void *obj_ptr,void *pLocal)
 {
     printf("-------leave-------\r\n");
 }
@@ -212,7 +212,7 @@ implement_vsf_thread(user_task_t)
 #endif
         printf("user_thread post user sem:\r\n");
 #if VSF_KERNEL_CFG_SUPPORT_SYNC
-        vsf_sem_post(this.psem);
+        vsf_sem_post(this.sem_ptr);
 #endif
     }
 }
@@ -223,7 +223,7 @@ implement_vsf_thread(user_task_t)
 
 #if VSF_KERNEL_CFG_EDA_SUPPORT_PT == ENABLED
 
-static implement_vsf_pt(user_pt_bmpevt_demo_slave_t)
+implement_vsf_pt(user_pt_bmpevt_demo_slave_t)
 {
     vsf_pt_begin();
     
@@ -242,7 +242,7 @@ static implement_vsf_pt(user_pt_bmpevt_demo_slave_t)
 
 
 
-static implement_vsf_pt(user_pt_bmpevt_demo_thread_t)
+implement_vsf_pt(user_pt_bmpevt_demo_thread_t)
 {
     vsf_pt_begin();
 
@@ -337,7 +337,7 @@ int main(void)
     do {
         static NO_INIT user_task_t __user_task;
 #   if VSF_KERNEL_CFG_SUPPORT_SYNC == ENABLED
-        __user_task.param.psem = &user_sem;
+        __user_task.param.sem_ptr = &user_sem;
 #   endif
         init_vsf_thread(user_task_t, &__user_task, vsf_prio_0);
     } while(0);

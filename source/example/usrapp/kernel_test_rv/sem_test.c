@@ -47,8 +47,7 @@ static void usrapp_sem_recv_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
     pend_next:
         if (VSF_ERR_NONE == vsf_eda_sem_pend(&usrapp_sem.sem, vsf_systimer_us_to_tick(100))) {
         process_sem:
-            vsf_trace(VSF_TRACE_INFO, "%d: eda_recv[%d] got sem\r\n",
-                        vsf_systimer_tick_to_ms(vsf_timer_get_tick()), idx);
+            vsf_trace(VSF_TRACE_INFO, "%d: eda_recv[%d] got sem\r\n", vsf_systimer_get_ms(), idx);
             goto pend_next;
         }
         break;
@@ -65,8 +64,7 @@ static void usrapp_sem_recv_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
                 ASSERT(false);
                 break;
             case VSF_SYNC_TIMEOUT:
-                vsf_trace(VSF_TRACE_INFO, "%d: eda_recv[%d] time out\r\n",
-                            vsf_systimer_tick_to_ms(vsf_timer_get_tick()), idx);
+                vsf_trace(VSF_TRACE_INFO, "%d: eda_recv[%d] time out\r\n", vsf_systimer_get_ms(), idx);
                 goto pend_next;
             case VSF_SYNC_PENDING:
                 return;
@@ -84,8 +82,7 @@ static void usrapp_sem_send_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
     case VSF_EVT_INIT:
         // fall through
     case VSF_EVT_TIMER:
-        vsf_trace(VSF_TRACE_INFO, "%d: eda_send[%d] post sem\r\n",
-                        vsf_systimer_tick_to_ms(vsf_timer_get_tick()), idx);
+        vsf_trace(VSF_TRACE_INFO, "%d: eda_send[%d] post sem\r\n", vsf_systimer_get_ms(), idx);
         vsf_eda_sem_post(&usrapp_sem.sem);
         vsf_teda_set_timer(vsf_systimer_us_to_tick(10));
         break;
@@ -101,7 +98,7 @@ void usrapp_sem_test_start(void)
             .fn.evthandler  = usrapp_sem_recv_evthandler,
             .priority       = vsf_prio_0 + i,
         };
-        vsf_teda_init_ex(&usrapp_sem.eda_recv[i], (vsf_eda_cfg_t *)&cfg);
+        vsf_teda_start(&usrapp_sem.eda_recv[i], (vsf_eda_cfg_t *)&cfg);
     }
 
     for (int i = 0; i < dimof(usrapp_sem.eda_send); i++) {
@@ -109,6 +106,6 @@ void usrapp_sem_test_start(void)
             .fn.evthandler  = usrapp_sem_send_evthandler,
             .priority       = vsf_prio_0 + i,
         };
-        vsf_teda_init_ex(&usrapp_sem.eda_send[i], (vsf_eda_cfg_t *)&cfg);
+        vsf_teda_start(&usrapp_sem.eda_send[i], (vsf_eda_cfg_t *)&cfg);
     }
 }

@@ -25,16 +25,23 @@
 #include "hal/driver/driver.h"
 #undef  __VSF_HEADER_ONLY_SHOW_ARCH_INFO__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*============================ MACROS ========================================*/
 
-#define __LITTLE_ENDIAN                 1
-#define __BYTE_ORDER                    __LITTLE_ENDIAN
+#ifndef __LITTLE_ENDIAN
+#   define __LITTLE_ENDIAN                 1
+#endif
+#ifndef __BYTE_ORDER
+#   define __BYTE_ORDER                    __LITTLE_ENDIAN
+#endif
 
 // TODO:
 #if __ARM_ARCH == 6 || __TARGET_ARCH_6_M == 1 || __TARGET_ARCH_6S_M == 1
 #   ifndef VSF_ARCH_PRI_NUM
 #       define VSF_ARCH_PRI_NUM         4
-#       undef  VSF_ARCH_PRI_BIT         
+#       undef  VSF_ARCH_PRI_BIT
 #       define VSF_ARCH_PRI_BIT         2
 #   endif
 
@@ -44,7 +51,7 @@
 #elif __ARM_ARCH >= 7 || __TARGET_ARCH_7_M == 1 || __TARGET_ARCH_7E_M == 1
 #   ifndef VSF_ARCH_PRI_NUM
 #       define VSF_ARCH_PRI_NUM         128
-#       undef  VSF_ARCH_PRI_BIT         
+#       undef  VSF_ARCH_PRI_BIT
 #       define VSF_ARCH_PRI_BIT         7
 #   endif
 
@@ -55,9 +62,12 @@
 
 // software interrupt provided by arch
 #define VSF_ARCH_SWI_NUM                1
-
 #define __VSF_ARCH_SYSTIMER_BITS        24
+
 /*============================ MACROFIED FUNCTIONS ===========================*/
+
+#define vsf_arch_wakeup()
+
 /*============================ TYPES =========================================*/
 
 typedef uint64_t vsf_systimer_cnt_t;
@@ -75,16 +85,15 @@ enum {
             vsf_arch_prio_##__N =                                               \
                 ((VSF_ARCH_PRI_NUM - 1 - __vsf_arch_prio_index_##__N)) & 0xFF,
 
-enum vsf_arch_prio_t {
+typedef enum vsf_arch_prio_t {
     // avoid vsf_arch_prio_t to be optimized to 8bit
     __VSF_ARCH_PRIO_LEAST_MAX       = INT16_MAX,
     __VSF_ARCH_PRIO_LEAST_MIN       = INT16_MIN,
-    VSF_ARCH_PRIO_IVALID            = -1,
-    vsf_arch_prio_ivalid            = -1,
+    VSF_ARCH_PRIO_INVALID           = -1,
+    vsf_arch_prio_invalid           = -1,
 
     REPEAT_MACRO(VSF_ARCH_PRI_NUM,__VSF_ARCH_PRI,VSF_ARCH_PRI_BIT)
-};
-typedef enum vsf_arch_prio_t vsf_arch_prio_t;
+} vsf_arch_prio_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ LOCAL VARIABLES ===============================*/
@@ -94,6 +103,10 @@ static ALWAYS_INLINE void vsf_arch_set_stack(uint32_t stack)
 {
     VSF_HAL_ASSERT(false);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 /* EOF */

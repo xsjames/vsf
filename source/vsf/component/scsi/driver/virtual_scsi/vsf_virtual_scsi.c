@@ -19,13 +19,13 @@
 
 #include "../../vsf_scsi_cfg.h"
 
-#if VSF_USE_SCSI == ENABLED && VSF_USE_MAL_SCSI == ENABLED
+#if VSF_USE_SCSI == ENABLED && VSF_SCSI_USE_VIRTUAL_SCSI == ENABLED
 
-#define VSF_SCSI_INHERIT
-#define VSF_VIRTUAL_SCSI_IMPLEMENT
+#define __VSF_SCSI_CLASS_INHERIT__
+#define __VSF_VIRTUAL_SCSI_CLASS_IMPLEMENT
 
-// TODO: use dedicated include
-#include "vsf.h"
+#include "../../vsf_scsi.h"
+#include "./vsf_virtual_scsi.h"
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -33,58 +33,36 @@
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ PROTOTYPES ====================================*/
 
-static void __vk_virtual_scsi_dummy(uintptr_t target, vsf_evt_t evt);
 static bool __vk_virtual_scsi_buffer(vk_scsi_t *pthis, uint8_t *cbd, vsf_mem_t *mem);
-static void __vk_virtual_scsi_init(uintptr_t target, vsf_evt_t evt);
-static void __vk_virtual_scsi_execute(uintptr_t target, vsf_evt_t evt);
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
-static void __vk_virtual_scsi_execute_stream(uintptr_t target, vsf_evt_t evt);
+dcl_vsf_peda_methods(static, __vk_virtual_scsi_init)
+dcl_vsf_peda_methods(static, __vk_virtual_scsi_fini)
+dcl_vsf_peda_methods(static, __vk_virtual_scsi_execute)
+#if VSF_USE_SIMPLE_STREAM == ENABLED
+dcl_vsf_peda_methods(static, __vk_virtual_scsi_execute_stream)
 #endif
 
 /*============================ LOCAL VARIABLES ===============================*/
 
-const i_scsi_drv_t VK_VIRTUAL_SCSI_DRV = {
-    .init               = __vk_virtual_scsi_init,
-    .fini               = __vk_virtual_scsi_dummy,
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
+const vk_scsi_drv_t vk_virtual_scsi_drv = {
+    .init               = (vsf_peda_evthandler_t)vsf_peda_func(__vk_virtual_scsi_init),
+    .fini               = (vsf_peda_evthandler_t)vsf_peda_func(__vk_virtual_scsi_fini),
     .buffer             = __vk_virtual_scsi_buffer,
-    .execute            = __vk_virtual_scsi_execute,
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
-    .execute_stream     = __vk_virtual_scsi_execute_stream,
+    .execute            = (vsf_peda_evthandler_t)vsf_peda_func(__vk_virtual_scsi_execute),
+#if VSF_USE_SIMPLE_STREAM == ENABLED
+    .execute_stream     = (vsf_peda_evthandler_t)vsf_peda_func(__vk_virtual_scsi_execute_stream),
 #endif
 };
 
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#endif
+
 /*============================ IMPLEMENTATION ================================*/
-
-static void __vk_virtual_scsi_dummy(uintptr_t target, vsf_evt_t evt)
-{
-    vk_scsi_t *pthis = (vk_scsi_t *)target;
-    VSF_SCSI_ASSERT(pthis != NULL);
-    pthis->result.errcode = VSF_ERR_NONE;
-    vsf_eda_return();
-}
-
-static void __vk_virtual_scsi_get_rw_param(uint8_t *cbd, uint64_t *addr, uint32_t *size)
-{
-    scsi_group_code_t group_code = cbd[0] & 0xE0;
-    switch (group_code) {
-    case SCSI_GROUPCODE6:
-        *addr = get_unaligned_be16(&cbd[2]);
-        *size = cbd[4];
-        break;
-    case SCSI_GROUPCODE10_1:
-        *addr = get_unaligned_be32(&cbd[2]);
-        *size = get_unaligned_be16(&cbd[7]);
-        break;
-    case SCSI_GROUPCODE16:
-        *addr = get_unaligned_be64(&cbd[2]);
-        *size = get_unaligned_be32(&cbd[7]);
-        break;
-    case SCSI_GROUPCODE12:
-        *addr = get_unaligned_be32(&cbd[2]);
-        *size = get_unaligned_be32(&cbd[6]);
-        break;
-    }
-}
 
 static bool __vk_virtual_scsi_buffer(vk_scsi_t *pthis, uint8_t *cbd, vsf_mem_t *mem)
 {
@@ -93,79 +71,117 @@ static bool __vk_virtual_scsi_buffer(vk_scsi_t *pthis, uint8_t *cbd, vsf_mem_t *
     bool is_read;
     VSF_SCSI_ASSERT((virtual_scsi != NULL) && (mem != NULL) && (virtual_scsi->virtual_scsi_drv != NULL));
 
-    cmd_code = cbd[0] & 0x1F;
+    cmd_code = (scsi_cmd_code_t)(cbd[0] & 0x1F);
     is_read = cmd_code == SCSI_CMDCODE_READ;
     if ((cmd_code != SCSI_CMDCODE_READ) && (cmd_code != SCSI_CMDCODE_WRITE)) {
-        mem->nSize = sizeof(virtual_scsi->reply);
-        mem->pchBuffer = virtual_scsi->reply;
+        mem->size = sizeof(virtual_scsi->reply);
+        mem->buffer = virtual_scsi->reply;
         return true;
     } else if (virtual_scsi->virtual_scsi_drv->buffer != NULL) {
-        scsi_group_code_t group_code = cbd[0] & 0xE0;
         uint64_t addr;
         uint32_t size;
 
-        __vk_virtual_scsi_get_rw_param(cbd, &addr, &size);
+        vk_scsi_get_rw_param(cbd, &addr, &size);
         return virtual_scsi->virtual_scsi_drv->buffer(pthis, is_read, addr, size, mem);
     }
     return false;
 }
 
-static void __vk_virtual_scsi_init(uintptr_t target, vsf_evt_t evt)
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_suppress=pe111
+#endif
+
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-align"
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wcast-align"
+#endif
+
+__vsf_component_peda_ifs_entry(__vk_virtual_scsi_init, vk_scsi_init)
 {
-    vk_virtual_scsi_t *pthis = (vk_virtual_scsi_t *)target;
+    vsf_peda_begin();
+    vk_virtual_scsi_t *pthis = (vk_virtual_scsi_t *)&vsf_this;
+    vsf_err_t err;
 
     switch (evt) {
     case VSF_EVT_INIT: {
-            const i_virtual_scsi_drv_t *drv = pthis->virtual_scsi_drv;
+            const vk_virtual_scsi_drv_t *drv = pthis->virtual_scsi_drv;
 
             switch (drv->drv_type) {
             case VSF_VIRTUAL_SCSI_DRV_NORMAL:
-                pthis->result.errcode = drv->normal.init(&pthis->use_as__vk_scsi_t);
-                vsf_eda_return();
+                vsf_eda_return(drv->normal.init(&pthis->use_as__vk_scsi_t));
                 break;
             case VSF_VIRTUAL_SCSI_DRV_PARAM_SUBCALL:
-                pthis->result.errcode = vsf_eda_call_param_eda(drv->param_subcall.init, pthis);
+                __vsf_component_call_peda_ifs(vk_virtual_scsi_init, err, drv->param_subcall.init, 0, pthis)
+                if (err != VSF_ERR_NONE) {
+                    goto do_return;
+                }
                 break;
             default:
                 VSF_SCSI_ASSERT(false);
-                pthis->result.errcode = VSF_ERR_NOT_SUPPORT;
-                vsf_eda_return();
+                vsf_eda_return(VSF_ERR_NOT_SUPPORT);
                 break;
             }
         }
         return;
     case VSF_EVT_RETURN:
-        vsf_eda_return();
+        err = (vsf_err_t)vsf_eda_get_return_value();
+    do_return:
+        vsf_eda_return(err);
         break;
     }
+    vsf_peda_end();
 }
 
-static vsf_err_t __vk_virtual_scsi_rw(vk_virtual_scsi_t *pthis)
+__vsf_component_peda_ifs_entry(__vk_virtual_scsi_fini, vk_scsi_fini)
 {
-    const i_virtual_scsi_drv_t *drv = pthis->virtual_scsi_drv;
-    vk_virtual_scsi_param_t *param = pthis->param;
-    uint8_t *cbd = pthis->args.cbd;
+    vsf_peda_begin();
+    vk_scsi_t *pthis = (vk_scsi_t *)&vsf_this;
+    VSF_SCSI_ASSERT(pthis != NULL);
+    vsf_eda_return(VSF_ERR_NONE);
+    vsf_peda_end();
+}
+
+static vsf_err_t __vk_virtual_scsi_rw(vk_virtual_scsi_t *pthis, uint8_t *cbd, void *mem_stream)
+{
+    const vk_virtual_scsi_drv_t *drv = pthis->virtual_scsi_drv;
     uint64_t addr;
     uint32_t size;
+    int_fast32_t result;
 
-    __vk_virtual_scsi_get_rw_param(cbd, &addr, &size);
-    pthis->addr = addr;
-    pthis->size = size;
+    vk_scsi_get_rw_param(cbd, &addr, &size);
 
-    scsi_cmd_code_t cmd_code = cbd[0] & 0x1F;
+    scsi_cmd_code_t cmd_code = (scsi_cmd_code_t)(cbd[0] & 0x1F);
     bool is_read = cmd_code == SCSI_CMDCODE_READ;
 
     switch (drv->drv_type) {
     case VSF_VIRTUAL_SCSI_DRV_NORMAL:
-        pthis->result.errcode = is_read ?
-                drv->normal.read(&pthis->use_as__vk_scsi_t, pthis->addr, pthis->size)
-            :   drv->normal.write(&pthis->use_as__vk_scsi_t, pthis->addr, pthis->size);
-        vsf_eda_return();
+        result = is_read ?
+                drv->normal.read(&pthis->use_as__vk_scsi_t, addr, size)
+            :   drv->normal.write(&pthis->use_as__vk_scsi_t, addr, size);
+        vsf_eda_return(result);
         return VSF_ERR_NONE;
     case VSF_VIRTUAL_SCSI_DRV_PARAM_SUBCALL:
-        pthis->result.errcode = is_read ?
-                vsf_eda_call_param_eda(drv->param_subcall.read, pthis)
-            :   vsf_eda_call_param_eda(drv->param_subcall.write, pthis);
+        if (is_read) {
+            vsf_err_t err;
+            __vsf_component_call_peda_ifs(vk_virtual_scsi_read, err, drv->param_subcall.read, 0, pthis,
+                .addr       = addr,
+                .size       = size,
+                .mem_stream = mem_stream,
+            )
+            UNUSED_PARAM(err);
+        } else {
+            vsf_err_t err;
+            __vsf_component_call_peda_ifs(vk_virtual_scsi_write, err, drv->param_subcall.write, 0, pthis,
+                .addr       = addr,
+                .size       = size,
+                .mem_stream = mem_stream,
+            )
+            UNUSED_PARAM(err);
+        }
         return VSF_ERR_NOT_READY;
     default:
         VSF_SCSI_ASSERT(false);
@@ -173,25 +189,27 @@ static vsf_err_t __vk_virtual_scsi_rw(vk_virtual_scsi_t *pthis)
     }
 }
 
-static void __vk_virtual_scsi_execute(uintptr_t target, vsf_evt_t evt)
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_warning=pe111
+#endif
+
+__vsf_component_peda_ifs_entry(__vk_virtual_scsi_execute, vk_scsi_execute)
 {
-    vk_virtual_scsi_t *pthis = (vk_virtual_scsi_t *)target;
+    vsf_peda_begin();
+    vk_virtual_scsi_t *pthis = (vk_virtual_scsi_t *)&vsf_this;
     vk_virtual_scsi_param_t *param = pthis->param;
 
-    uint8_t *reply = pthis->args.mem.pchBuffer;
-    int_fast32_t reply_len = pthis->args.mem.nSize;
+    uint8_t *reply = vsf_local.mem.buffer;
+    int_fast32_t reply_len = vsf_local.mem.size;
 
     switch (evt) {
     case VSF_EVT_INIT: {
-            uint8_t *scsi_cmd;
-            scsi_group_code_t group_code;
-            scsi_cmd_code_t cmd_code;
+            uint8_t *scsi_cmd = vsf_local.cbd;
+            scsi_group_code_t group_code = (scsi_group_code_t)(scsi_cmd[0] & 0xE0);
+            scsi_cmd_code_t cmd_code = (scsi_cmd_code_t)(scsi_cmd[0] & 0x1F);
 
-            scsi_cmd = pthis->args.cbd;
-            group_code = scsi_cmd[0] & 0xE0;
-            cmd_code = scsi_cmd[0] & 0x1F;
-
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+#if VSF_USE_SIMPLE_STREAM == ENABLED
             pthis->is_stream = false;
 #endif
             if (reply == pthis->reply) {
@@ -222,7 +240,7 @@ static void __vk_virtual_scsi_execute(uintptr_t target, vsf_evt_t evt)
                     }
                 case SCSI_CMDCODE_READ:
                 case SCSI_CMDCODE_WRITE:
-                    __vk_virtual_scsi_rw(pthis);
+                    __vk_virtual_scsi_rw(pthis, scsi_cmd, &vsf_local.mem);
                     return;
                 case SCSI_CMDCODE_INQUIRY:
                     if (scsi_cmd[1] & 1) {
@@ -287,7 +305,7 @@ static void __vk_virtual_scsi_execute(uintptr_t target, vsf_evt_t evt)
                     break;
                 case SCSI_CMDCODE_READ:
                 case SCSI_CMDCODE_WRITE:
-                    __vk_virtual_scsi_rw(pthis);
+                    __vk_virtual_scsi_rw(pthis, scsi_cmd, &vsf_local.mem);
                     return;
                 default:
                     goto exit_invalid_cmd;
@@ -307,7 +325,7 @@ static void __vk_virtual_scsi_execute(uintptr_t target, vsf_evt_t evt)
                 switch (cmd_code) {
                 case SCSI_CMDCODE_READ:
                 case SCSI_CMDCODE_WRITE:
-                    __vk_virtual_scsi_rw(pthis);
+                    __vk_virtual_scsi_rw(pthis, scsi_cmd, &vsf_local.mem);
                     return;
                 default:
                     goto exit_invalid_cmd;
@@ -317,7 +335,7 @@ static void __vk_virtual_scsi_execute(uintptr_t target, vsf_evt_t evt)
                 switch (cmd_code) {
                 case SCSI_CMDCODE_READ:
                 case SCSI_CMDCODE_WRITE:
-                    __vk_virtual_scsi_rw(pthis);
+                    __vk_virtual_scsi_rw(pthis, scsi_cmd, &vsf_local.mem);
                     return;
                 default:
                     goto exit_invalid_cmd;
@@ -327,13 +345,11 @@ static void __vk_virtual_scsi_execute(uintptr_t target, vsf_evt_t evt)
                 goto exit_invalid_cmd;
             }
 
-            pthis->result.reply_len = reply_len;
-            pthis->result.errcode = VSF_ERR_NONE;
-            vsf_eda_return();
+            vsf_eda_return(reply_len);
             break;
         }
     case VSF_EVT_RETURN:
-        vsf_eda_return();
+        vsf_eda_return(vsf_eda_get_return_value());
         break;
     }
     return;
@@ -341,40 +357,48 @@ static void __vk_virtual_scsi_execute(uintptr_t target, vsf_evt_t evt)
 exit_invalid_cmd:
     pthis->sense_key = SCSI_SENSEKEY_ILLEGAL_REQUEST;
     pthis->asc = SCSI_ASC_INVALID_COMMAND;
-    pthis->result.errcode = VSF_ERR_FAIL;
-    vsf_eda_return();
+    vsf_eda_return(VSF_ERR_FAIL);
     return;
 exit_invalid_field_in_cmd:
     pthis->sense_key = SCSI_SENSEKEY_ILLEGAL_REQUEST;
     pthis->asc = SCSI_ASC_INVALID_FIELD_IN_COMMAND;
-    pthis->result.errcode = VSF_ERR_FAIL;
-    vsf_eda_return();
+    vsf_eda_return(VSF_ERR_FAIL);
     return;
+/*
 exit_not_ready:
     pthis->sense_key = SCSI_SENSEKEY_NOT_READY;
     pthis->asc = SCSI_ASC_NONE;
-    pthis->result.errcode = VSF_ERR_FAIL;
-    vsf_eda_return();
+    vsf_eda_return(VSF_ERR_FAIL);
     return;
+*/
+    vsf_peda_end();
 }
 
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
-static void __vk_virtual_scsi_execute_stream(uintptr_t target, vsf_evt_t evt)
+#if VSF_USE_SIMPLE_STREAM == ENABLED
+__vsf_component_peda_ifs_entry(__vk_virtual_scsi_execute_stream, vk_scsi_execute_stream)
 {
+    vsf_peda_begin();
     switch (evt) {
     case VSF_EVT_INIT: {
-            vk_virtual_scsi_t *pthis = (vk_virtual_scsi_t *)target;
-            scsi_cmd_code_t cmd_code = pthis->args.cbd[0] & 0x1F;
+            vk_virtual_scsi_t *pthis = (vk_virtual_scsi_t *)&vsf_this;
+            scsi_cmd_code_t cmd_code = (scsi_cmd_code_t)(vsf_local.cbd[0] & 0x1F);
             VSF_SCSI_ASSERT((SCSI_CMDCODE_READ == cmd_code) || (SCSI_CMDCODE_WRITE == cmd_code));
             pthis->is_stream = true;
-            __vk_virtual_scsi_rw(pthis);
+            __vk_virtual_scsi_rw(pthis, vsf_local.cbd, vsf_local.stream);
         }
         break;
     case VSF_EVT_RETURN:
-        vsf_eda_return();
+        vsf_eda_return(vsf_eda_get_return_value());
         break;
     }
+    vsf_peda_end();
 }
+#endif
+
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic pop
 #endif
 
 #endif

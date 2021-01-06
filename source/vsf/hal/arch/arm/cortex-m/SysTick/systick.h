@@ -22,6 +22,9 @@
 #include "hal/vsf_hal_cfg.h"
 #include "./systick_internal.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 
@@ -38,8 +41,8 @@
 
 #define vsf_systick_cfg(...)                    \
         do {                                    \
-            systick_cfg_t tCFG = {__VA_ARGS__}; \
-            vsf_systick_init(&tCFG);            \
+            systick_cfg_t cfg = {__VA_ARGS__}; \
+            vsf_systick_init(&cfg);            \
         } while(false)
 
 /*============================ TYPES =========================================*/
@@ -94,5 +97,8 @@ extern const systick_t SYSTICK;
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ PROTOTYPES ====================================*/
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* end of __SYS_TICK_H__ */

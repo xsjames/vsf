@@ -60,13 +60,13 @@
 #   define protected_member(...)            PLOOC_VISIBLE(__VA_ARGS__)
 #   define public_member(...)               PLOOC_VISIBLE(__VA_ARGS__)
 
-#elif   defined(__PLOOC_CLASS_IMPLEMENT)
+#elif   defined(__PLOOC_CLASS_IMPLEMENT__)
 
 #   define private_member(...)              PLOOC_VISIBLE(__VA_ARGS__)
 #   define protected_member(...)            PLOOC_VISIBLE(__VA_ARGS__)
 #   define public_member(...)               PLOOC_VISIBLE(__VA_ARGS__)
 
-#elif   defined(__PLOOC_CLASS_INHERIT)
+#elif   defined(__PLOOC_CLASS_INHERIT__)
 
 #   define private_member(...)              PLOOC_INVISIBLE(__VA_ARGS__)
 #   define protected_member(...)            PLOOC_VISIBLE(__VA_ARGS__)
@@ -100,7 +100,7 @@
     };                      
     
 
-#if     defined(__PLOOC_CLASS_IMPLEMENT)
+#if     defined(__PLOOC_CLASS_IMPLEMENT__)
 
 #   undef  __class
 #   define __class(__NAME)                  __NAME
@@ -124,6 +124,7 @@
 #   undef __class_internal
 #   define __class_internal(__SRC, __DES, __TYPE, ...)                          \
             class(__TYPE) *(__DES) = (class(__TYPE) *)(__SRC);                  \
+            PLOOC_UNUSED_PARAM(__DES);                                          \
             __with_class(__TYPE, (__SRC), __VA_ARGS__)
             
 #   undef class_internal
@@ -134,7 +135,7 @@
 
 #define __end_extern_class(...)
         
-#elif   defined(__PLOOC_CLASS_INHERIT)
+#elif   defined(__PLOOC_CLASS_INHERIT__)
 
 #   undef  __class_protected
 #   define __class_protected(__NAME)            __NAME
@@ -148,6 +149,7 @@
 #   define __with_protected(__TYPE, __SRC, ...)                                 \
         {                                                                       \
             class_protected(__TYPE)*_ =(class_protected(__TYPE) *)(__SRC);      \
+            PLOOC_UNUSED_PARAM(_);                                              \
             __VA_ARGS__;                                                        \
         }
 
@@ -159,6 +161,7 @@
 #   undef __protected_internal
 #   define __protected_internal(__SRC, __DES, __TYPE, ...)                      \
             class_protected(__TYPE) *(__DES)=(class_protected(__TYPE) *)(__SRC);\
+            PLOOC_UNUSED_PARAM(__DES);                                          \
             __with_protected(__TYPE, __SRC, __VA_ARGS__)
 
 #   undef protected_internal            
@@ -191,8 +194,8 @@
 
 #define end_extern_class(__NAME, ...)   __end_extern_class(__NAME, __VA_ARGS__)
 
-#undef __PLOOC_CLASS_IMPLEMENT
-#undef __PLOOC_CLASS_INHERIT
+#undef __PLOOC_CLASS_IMPLEMENT__
+#undef __PLOOC_CLASS_INHERIT__
 /*============================ TYPES =========================================*/
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ LOCAL VARIABLES ===============================*/

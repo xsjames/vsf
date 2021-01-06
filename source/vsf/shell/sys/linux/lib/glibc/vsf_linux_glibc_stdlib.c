@@ -19,9 +19,22 @@
 
 #include "../../vsf_linux_cfg.h"
 
-#if VSF_USE_LINUX == ENABLED
+#if VSF_USE_LINUX == ENABLED && VSF_LINUX_USE_SIMPLE_STDLIB == ENABLED
 
-#include "../../vsf_linux.h"
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED
+#   include "../../include/unistd.h"
+#   include "../../include/simple_libc/stdlib.h"
+#else
+#   include <unistd.h>
+#   include <stdlib.h>
+#endif
+
+// for memset
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED && VSF_LINUX_USE_SIMPLE_STRING == ENABLED
+#   include "../../include/simple_libc/string.h"
+#else
+#   include <string.h>
+#endif
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -39,6 +52,15 @@ void * malloc(size_t size)
 
 void * realloc(void *p, size_t size)
 {
+    if (NULL == p) {
+        return vsf_heap_malloc(size);
+    }
+    if (0 == size) {
+        if (p != NULL) {
+            vsf_heap_free(p);
+        }
+        return NULL;
+    }
     return vsf_heap_realloc(p, size);
 }
 
@@ -49,7 +71,7 @@ void free(void *p)
     }
 }
 
-void *calloc(size_t n, size_t size)
+void * calloc(size_t n, size_t size)
 {
     size_t allsize = n * size;
     void *buf = malloc(allsize);
@@ -60,4 +82,38 @@ void *calloc(size_t n, size_t size)
 }
 #endif
 
-#endif      // VSF_USE_LINUX
+char * itoa(int num, char *str, int radix)
+{
+    char index[] = "0123456789ABCDEF";
+    unsigned unum;
+    int i = 0, j, k;
+
+    if (radix == 10 && num < 0) {
+        unum = (unsigned)-num;
+        str[i++] = '-';
+    } else {
+        unum = (unsigned)num;
+    }
+
+    do{
+        str[i++] = index[unum % (unsigned)radix];
+        unum /= radix;
+   } while (unum);
+
+    str[i] = '\0';
+    if (str[0] == '-') {
+        k = 1;
+    } else {
+        k = 0;
+    }
+
+    for (j = k; j <= (i - 1) / 2; j++) {
+        char temp;
+        temp = str[j];
+        str[j] = str[i - 1 + k - j];
+        str[i - 1 + k - j] = temp;
+    }
+    return str;
+}
+
+#endif      // VSF_USE_LINUX && VSF_LINUX_USE_SIMPLE_STDLIB

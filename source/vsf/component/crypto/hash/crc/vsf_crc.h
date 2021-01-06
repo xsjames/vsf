@@ -22,21 +22,24 @@
 
 #include "../../vsf_crypto_cfg.h"
 
-#if VSF_USE_CRC == ENABLED
+#if VSF_HASH_USE_CRC == ENABLED
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct vsf_crc_t {
+typedef struct vsf_crc_t {
     enum {
         VSF_CRC_BITLEN8 = 8,
         VSF_CRC_BITLEN16 = 16,
         VSF_CRC_BITLEN32 = 32,
     } bitlen;
     uint32_t poly;
-};
-typedef struct vsf_crc_t vsf_crc_t;
+} vsf_crc_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
@@ -45,6 +48,10 @@ extern const vsf_crc_t vsf_crc8_ccitt;
 /*============================ PROTOTYPES ====================================*/
 
 extern uint_fast32_t vsf_crc(const vsf_crc_t *crc, uint_fast32_t initial, uint8_t *buff, uint_fast32_t bytesize);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 #endif

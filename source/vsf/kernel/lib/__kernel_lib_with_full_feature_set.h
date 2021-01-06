@@ -24,7 +24,7 @@
 /*============================ MACROS ========================================*/
 #define VSF_USE_KERNEL                                          ENABLED
 
-#define     VSF_KERNEL_CFG_SUPPORT_PREMPT                       ENABLED
+#define     VSF_KERNEL_CFG_ALLOW_KERNEL_BEING_PREEMPTED                       ENABLED
 #define         VSF_KERNEL_CFG_SUPPORT_DYNAMIC_PRIOTIRY         ENABLED
 #define         VSF_KERNEL_CFG_SUPPORT_EVT_MESSAGE              ENABLED
 
@@ -38,7 +38,7 @@
 #define         VSF_KERNEL_CFG_SUPPORT_SYNC_IRQ                 ENABLED
 #define         VSF_KERNEL_CFG_SUPPORT_BITMAP_EVENT             ENABLED
 #define         VSF_KERNEL_CFG_SUPPORT_MSG_QUEUE                ENABLED
-#define         VSF_USE_KERNEL_SIMPLE_SHELL                     ENABLED
+#define         VSF_KERNEL_USE_SIMPLE_SHELL                     ENABLED
 
 #define     VSF_KERNEL_CFG_EDA_SUPPORT_TIMER                    ENABLED
 #define         VSF_KERNEL_CFG_CALLBACK_TIMER                   ENABLED

@@ -22,28 +22,40 @@
 
 #include "../../vsf_fs_cfg.h"
 
-#if VSF_USE_FS == ENABLED && VSF_USE_MEMFS == ENABLED
+#if VSF_USE_FS == ENABLED && VSF_FS_USE_MEMFS == ENABLED
 
-#if     defined(VSF_MEMFS_IMPLEMENT)
-#   undef VSF_MEMFS_IMPLEMENT
-#   define __PLOOC_CLASS_IMPLEMENT
-#elif   defined(VSF_MEMFS_INHERIT)
-#   undef VSF_MEMFS_INHERIT
-#   define __PLOOC_CLASS_INHERIT
+#if     defined(__VSF_MEMFS_CLASS_IMPLEMENT)
+#   undef __VSF_MEMFS_CLASS_IMPLEMENT
+#   define __PLOOC_CLASS_IMPLEMENT__
 #endif
 
 #include "utilities/ooc_class.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-declare_simple_class(vk_memfs_file_t)
+dcl_simple_class(vk_memfs_file_t)
+
+__vsf_component_peda_ifs(vk_memfs_callback_read,
+    uint64_t        offset;
+    uint32_t        size;
+    uint8_t         *buff;
+)
+__vsf_component_peda_ifs(vk_memfs_callback_write,
+    uint64_t        offset;
+    uint32_t        size;
+    uint8_t         *buff;
+)
 
 def_simple_class(vk_memfs_file_t) {
-    implement(vk_file_t)
-
     public_member(
+        implement(vk_file_t)
+
         union {
             struct {
                 uint8_t *buff;
@@ -61,10 +73,9 @@ def_simple_class(vk_memfs_file_t) {
     )
 };
 
-struct vk_memfs_info_t {
+typedef struct vk_memfs_info_t {
     vk_memfs_file_t root;
-};
-typedef struct vk_memfs_info_t vk_memfs_info_t;
+} vk_memfs_info_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
@@ -72,5 +83,14 @@ extern const vk_fs_op_t vk_memfs_op;
 
 /*============================ PROTOTYPES ====================================*/
 
-#endif      // VSF_USE_FS && VSF_USE_FATFS
+extern void vk_memfs_init(vk_memfs_info_t *memfs);
+extern vk_memfs_file_t * vk_memfs_open(vk_memfs_file_t *dir, const char *path);
+extern int_fast32_t vk_memfs_read(vk_memfs_file_t *file, uint_fast64_t addr, uint_fast32_t size, uint8_t *buff);
+extern int_fast32_t vk_memfs_write(vk_memfs_file_t *file, uint_fast64_t addr, uint_fast32_t size, uint8_t *buff);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif      // VSF_USE_FS && VSF_FS_USE_MEMFS
 #endif      // __VSF_MEMFS_H__

@@ -19,11 +19,14 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if VSF_USE_USB_HOST == ENABLED && VSF_USE_USB_HOST_BTHCI == ENABLED
+#if VSF_USE_USB_HOST == ENABLED && VSF_USBH_USE_BTHCI == ENABLED
 
-#define VSF_USBH_IMPLEMENT_vk_usbh_hcd_urb_t
-#define VSF_USBH_IMPLEMENT_CLASS
-#include "vsf.h"
+#define __VSF_EDA_CLASS_INHERIT__
+#define __VSF_USBH_CLASS_IMPLEMENT_CLASS__
+
+#include "kernel/vsf_kernel.h"
+#include "../../vsf_usbh.h"
+#include "./vsf_usbh_BTHCI.h"
 
 /*============================ MACROS ========================================*/
 
@@ -81,20 +84,17 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-typedef struct vk_usbh_bthci_t vk_usbh_bthci_t;
-
 // input/output control block
-struct vk_usbh_bthci_iocb_t {
+typedef struct vk_usbh_bthci_iocb_t {
     vk_usbh_urb_t urb;
     uint8_t type;
     uint8_t is_supported    : 1;
     uint8_t is_icb          : 1;
     uint8_t is_busy         : 1;
     uint8_t is_ep0_claimed  : 1;
-};
-typedef struct vk_usbh_bthci_iocb_t vk_usbh_bthci_iocb_t;
+} vk_usbh_bthci_iocb_t;
 
-struct vk_usbh_bthci_t {
+typedef struct vk_usbh_bthci_t {
     vk_usbh_t *usbh;
     vk_usbh_dev_t *dev;
     vk_usbh_ifs_t *ifs;
@@ -136,13 +136,11 @@ struct vk_usbh_bthci_t {
                     +   VSF_USBH_BTHCI_CFG_ACL_IN_NUM + VSF_USBH_BTHCI_CFG_SCO_IN_NUM
                     +   VSF_USBH_BTHCI_CFG_ACL_OUT_NUM + VSF_USBH_BTHCI_CFG_SCO_OUT_NUM];
     };
-};
-typedef struct vk_usbh_bthci_t vk_usbh_bthci_t;
+} vk_usbh_bthci_t;
 
 /*============================ LOCAL VARIABLES ===============================*/
 
-static const vk_usbh_dev_id_t vk_usbh_bthci_dev_id[] =
-{
+static const vk_usbh_dev_id_t __vk_usbh_bthci_dev_id[] = {
     { VSF_USBH_MATCH_DEV_CLASS(USB_CLASS_WIRELESS_CONTROLLER, 0x01, 0x01) },
     // BCM20702
     {
@@ -154,38 +152,24 @@ static const vk_usbh_dev_id_t vk_usbh_bthci_dev_id[] =
 
 /*============================ PROTOTYPES ====================================*/
 
-static void * vk_usbh_bthci_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs);
-static void vk_usbh_bthci_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param);
+static void * __vk_usbh_bthci_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs);
+static void __vk_usbh_bthci_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param);
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
 const vk_usbh_class_drv_t vk_usbh_bthci_drv = {
     .name       = "bthci_usb",
-    .dev_id_num = dimof(vk_usbh_bthci_dev_id),
-    .dev_ids    = vk_usbh_bthci_dev_id,
-    .probe      = vk_usbh_bthci_probe,
-    .disconnect = vk_usbh_bthci_disconnect,
+    .dev_id_num = dimof(__vk_usbh_bthci_dev_id),
+    .dev_ids    = __vk_usbh_bthci_dev_id,
+    .probe      = __vk_usbh_bthci_probe,
+    .disconnect = __vk_usbh_bthci_disconnect,
 };
 
 /*============================ PROTOTYPES ====================================*/
 
-#if     defined(WEAK_VSF_USBH_BTHCI_ON_NEW_EXTERN)                              \
-    &&  defined(WEAK_VSF_USBH_BTHCI_ON_NEW)
-WEAK_VSF_USBH_BTHCI_ON_NEW_EXTERN
-#endif
-
-#if     defined(WEAK_VSF_USBH_BTHCI_ON_DEL_EXTERN)                              \
-    &&  defined(WEAK_VSF_USBH_BTHCI_ON_DEL)
-WEAK_VSF_USBH_BTHCI_ON_DEL_EXTERN
-#endif
-
-#if     defined(WEAK_VSF_USBH_BTHCI_ON_PACKET_EXTERN)                           \
-    &&  defined(WEAK_VSF_USBH_BTHCI_ON_PACKET)
-WEAK_VSF_USBH_BTHCI_ON_PACKET_EXTERN
-#endif
-
-SECTION(".text.vsf.kernel.eda")
-vsf_err_t __vsf_eda_fini(vsf_eda_t *pthis);
+extern void vsf_usbh_bthci_on_new(void *dev, vk_usbh_dev_id_t *id);
+extern void vsf_usbh_bthci_on_del(void *dev);
+extern void vsf_usbh_bthci_on_packet(void *dev, uint8_t type, uint8_t *packet, uint16_t size);
 
 /*============================ IMPLEMENTATION ================================*/
 
@@ -204,7 +188,7 @@ WEAK(vsf_usbh_bthci_on_packet)
 void vsf_usbh_bthci_on_packet(void *dev, uint8_t type, uint8_t *packet, uint16_t size) {}
 #endif
 
-static vk_usbh_bthci_iocb_t * vk_usbh_bthci_get_iocb(vk_usbh_bthci_t *bthci, vk_usbh_hcd_urb_t *urb_hcd)
+static vk_usbh_bthci_iocb_t * __vk_usbh_bthci_get_iocb(vk_usbh_bthci_t *bthci, vk_usbh_hcd_urb_t *urb_hcd)
 {
     vk_usbh_bthci_iocb_t *iocb = bthci->iocb;
     for (int i = 0; i < dimof(bthci->iocb); i++, iocb++) {
@@ -215,7 +199,7 @@ static vk_usbh_bthci_iocb_t * vk_usbh_bthci_get_iocb(vk_usbh_bthci_t *bthci, vk_
     return NULL;
 }
 
-static vk_usbh_bthci_iocb_t * vk_usbh_bthci_get_ocb(vk_usbh_bthci_t *bthci, uint8_t type)
+static vk_usbh_bthci_iocb_t * __vk_usbh_bthci_get_ocb(vk_usbh_bthci_t *bthci, uint8_t type)
 {
     vk_usbh_bthci_iocb_t *ocb = bthci->ocb;
     for (int i = 0; i < dimof(bthci->ocb); i++, ocb++) {
@@ -240,7 +224,7 @@ static vk_usbh_bthci_iocb_t * vk_usbh_bthci_get_ocb(vk_usbh_bthci_t *bthci, uint
     return NULL;
 }
 
-static void vk_usbh_bthci_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
+static void __vk_usbh_bthci_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
 {
     vk_usbh_bthci_t *bthci = container_of(eda, vk_usbh_bthci_t, eda);
     vk_usbh_dev_t *dev = bthci->dev;
@@ -281,7 +265,7 @@ static void vk_usbh_bthci_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
                         ||  (NULL == vk_usbh_urb_alloc_buffer(&bthci->sco_icb[i].urb, VSF_USBH_BTHCI_CFG_URB_BUFSIZE))
                         ||  (VSF_ERR_NONE != vk_usbh_submit_urb(usbh, &bthci->sco_icb[i].urb)))) {
                     // ignore errors and go on
-                    vsf_trace(VSF_TRACE_ERROR, "fail to prepare scoin_icb %d", i);
+                    vsf_trace_error("fail to prepare scoin_icb %d", i);
                     break;
                 }
             }
@@ -294,19 +278,15 @@ static void vk_usbh_bthci_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
                         ||  (NULL == vk_usbh_urb_alloc_buffer(&bthci->acl_icb[i].urb, VSF_USBH_BTHCI_CFG_URB_BUFSIZE))
                         ||  (VSF_ERR_NONE != vk_usbh_submit_urb(usbh, &bthci->acl_icb[i].urb)))) {
                     // ignore errors and go on
-                    vsf_trace(VSF_TRACE_ERROR, "fail to prepare aclin_icb %d", i);
+                    vsf_trace_error("fail to prepare aclin_icb %d", i);
                     break;
                 }
             }
 #endif
 
-#ifndef WEAK_VSF_USBH_BTHCI_ON_NEW
             vsf_usbh_bthci_on_new(bthci, &bthci->id);
-#else
-            WEAK_VSF_USBH_BTHCI_ON_NEW(bthci, &bthci->id);
-#endif
         } else {
-            vk_usbh_bthci_iocb_t *iocb = vk_usbh_bthci_get_iocb(bthci, (vk_usbh_hcd_urb_t *)vsf_eda_get_cur_msg());
+            vk_usbh_bthci_iocb_t *iocb = __vk_usbh_bthci_get_iocb(bthci, (vk_usbh_hcd_urb_t *)vsf_eda_get_cur_msg());
             vk_usbh_urb_t *urb;
             VSF_USB_ASSERT(iocb != NULL);
             urb = &iocb->urb;
@@ -317,13 +297,8 @@ static void vk_usbh_bthci_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
 
             if (iocb->is_icb) {
                 if (URB_OK == status) {
-#ifndef WEAK_VSF_USBH_BTHCI_ON_PACKET
                     vsf_usbh_bthci_on_packet(bthci, iocb->type | BTHCI_PACKET_TYPE_IN,
                         buffer, actual_length);
-#else
-                    WEAK_VSF_USBH_BTHCI_ON_PACKET(bthci, iocb->type | BTHCI_PACKET_TYPE_IN,
-                        buffer, actual_length);
-#endif
                 }
                 err = vk_usbh_submit_urb(usbh, urb);
             } else {
@@ -333,13 +308,8 @@ static void vk_usbh_bthci_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
                 }
                 iocb->is_busy = false;
                 if (URB_OK == status) {
-#ifndef WEAK_VSF_USBH_BTHCI_ON_PACKET
                     vsf_usbh_bthci_on_packet(bthci, iocb->type | BTHCI_PACKET_TYPE_OUT,
                         buffer, actual_length);
-#else
-                    WEAK_VSF_USBH_BTHCI_ON_PACKET(bthci, iocb->type | BTHCI_PACKET_TYPE_OUT,
-                        buffer, actual_length);
-#endif
                 }
             }
         }
@@ -351,7 +321,7 @@ static void vk_usbh_bthci_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
     }
 }
 
-static void vk_usbh_bthci_free_all(vk_usbh_bthci_t *bthci)
+static void __vk_usbh_bthci_free_all(vk_usbh_bthci_t *bthci)
 {
     vk_usbh_t *usbh = bthci->usbh;
     vk_usbh_bthci_iocb_t *iocb = bthci->iocb;
@@ -362,13 +332,13 @@ static void vk_usbh_bthci_free_all(vk_usbh_bthci_t *bthci)
     }
 }
 
-static void vk_usbh_bthci_on_eda_terminate(vsf_eda_t *eda)
+static void __vk_usbh_bthci_on_eda_terminate(vsf_eda_t *eda)
 {
     vk_usbh_bthci_t *bthci = container_of(eda, vk_usbh_bthci_t, eda);
-    VSF_USBH_FREE(bthci);
+    vsf_usbh_free(bthci);
 }
 
-static void * vk_usbh_bthci_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs)
+static void * __vk_usbh_bthci_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_ifs_parser_t *parser_ifs)
 {
     vk_usbh_ifs_t *ifs = parser_ifs->ifs;
     struct usb_interface_desc_t *desc_ifs = parser_ifs->parser_alt[ifs->cur_alt].desc_ifs;
@@ -382,7 +352,7 @@ static void * vk_usbh_bthci_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_i
         return NULL;
     }
 
-    bthci = VSF_USBH_MALLOC(sizeof(vk_usbh_bthci_t));
+    bthci = vsf_usbh_malloc(sizeof(vk_usbh_bthci_t));
     if (NULL == bthci) {
         return NULL;
     }
@@ -460,43 +430,43 @@ static void * vk_usbh_bthci_probe(vk_usbh_t *usbh, vk_usbh_dev_t *dev, vk_usbh_i
     bthci->cmd_ocb.is_icb = false;
     bthci->cmd_ocb.urb.urb_hcd = dev->ep0.urb.urb_hcd;
 
-    vsf_eda_set_evthandler(&(bthci->eda), vk_usbh_bthci_evthandler);
-    bthci->eda.on_terminate = vk_usbh_bthci_on_eda_terminate;
+    bthci->eda.fn.evthandler = __vk_usbh_bthci_evthandler;
+    bthci->eda.on_terminate = __vk_usbh_bthci_on_eda_terminate;
     vsf_eda_init(&bthci->eda, vsf_prio_inherit, false);
     return bthci;
 
 free_all:
-    vk_usbh_bthci_free_all(bthci);
-    VSF_USBH_FREE(bthci);
+    __vk_usbh_bthci_free_all(bthci);
+    vsf_usbh_free(bthci);
     return NULL;
 }
 
-static void vk_usbh_bthci_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param)
+static void __vk_usbh_bthci_disconnect(vk_usbh_t *usbh, vk_usbh_dev_t *dev, void *param)
 {
     vk_usbh_bthci_t *bthci = param;
 
-#ifndef WEAK_VSF_USBH_BTHCI_ON_DEL
     vsf_usbh_bthci_on_del(bthci);
-#else
-    WEAK_VSF_USBH_BTHCI_ON_DEL(bthci);
-#endif
-
-    vk_usbh_bthci_free_all(bthci);
-    __vsf_eda_fini(&bthci->eda);
+    __vk_usbh_bthci_free_all(bthci);
+    vsf_eda_fini(&bthci->eda);
 }
 
 bool vk_usbh_bthci_can_send(void *dev, uint8_t type)
 {
     vk_usbh_bthci_t *bthci = dev;
-    vk_usbh_bthci_iocb_t *ocb = vk_usbh_bthci_get_ocb(bthci, type);
+    vk_usbh_bthci_iocb_t *ocb = __vk_usbh_bthci_get_ocb(bthci, type);
     return ocb != NULL;
 }
+
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_suppress=pe111
+#endif
 
 vsf_err_t vk_usbh_bthci_send(void *dev, uint8_t type, uint8_t *packet, uint16_t size)
 {
     vk_usbh_bthci_t *bthci = dev;
     vk_usbh_t *usbh = bthci->usbh;
-    vk_usbh_bthci_iocb_t *ocb = vk_usbh_bthci_get_ocb(bthci, type);
+    vk_usbh_bthci_iocb_t *ocb = __vk_usbh_bthci_get_ocb(bthci, type);
     vk_usbh_urb_t *urb;
     uint_fast16_t flags = 0;
 
@@ -520,7 +490,17 @@ vsf_err_t vk_usbh_bthci_send(void *dev, uint8_t type, uint8_t *packet, uint16_t 
 
             ocb->is_ep0_claimed = true;
             ocb->is_busy = true;
-            vk_usbh_urb_set_buffer(urb, packet, size);
+
+            // allocate a new buffer in case original buffer is not aligned
+            // TODO: only necessary if hcd does not support unaligned access
+            uint8_t *buffer = vk_usbh_urb_alloc_buffer(&bthci->dev->ep0.urb, size);
+            if (NULL == buffer) {
+                VSF_USB_ASSERT(false);
+                return VSF_ERR_NOT_ENOUGH_RESOURCES;
+            }
+            memcpy(buffer, packet, size);
+
+//            vk_usbh_urb_set_buffer(urb, packet, size);
             return vk_usbh_control_msg_ex(usbh, bthci->dev, &req, 0, &bthci->eda);
         }
         break;
@@ -559,4 +539,10 @@ vsf_err_t vk_usbh_bthci_send(void *dev, uint8_t type, uint8_t *packet, uint16_t 
     return vk_usbh_submit_urb_ex(usbh, urb, flags, &bthci->eda);
 }
 
-#endif      // VSF_USE_USB_HOST && VSF_USE_USB_HOST_BTHCI
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_warning=pe111
+#endif
+
+
+#endif      // VSF_USE_USB_HOST && VSF_USBH_USE_BTHCI

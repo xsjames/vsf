@@ -19,13 +19,23 @@
 
 #include "../../vsf_linux_cfg.h"
 
-#if VSF_USE_LINUX == ENABLED
+#if VSF_USE_LINUX == ENABLED && VSF_LINUX_USE_SIMPLE_STDIO == ENABLED
 
-#include "../../vsf_linux.h"
-
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/types.h>
+#define __VSF_LINUX_CLASS_INHERIT__
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED
+#   include "../../include/unistd.h"
+#   include "../../include/sys/types.h"
+#   include "../../include/simple_libc/stdio.h"
+#else
+#   include <unistd.h>
+#   include <sys/types.h>
+#   include <stdio.h>
+#endif
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED && VSF_LINUX_USE_SIMPLE_STRING == ENABLED
+#   include "../../include/simple_libc/string.h"
+#else
+#   include <string.h>
+#endif
 
 /*============================ MACROS ========================================*/
 
@@ -37,31 +47,102 @@
 /*============================ TYPES =========================================*/
 /*============================ GLOBAL VARIABLES ==============================*/
 
-FILE *stdin, *stdout, *stderr;
+static int stdin_fd = STDIN_FILENO, stdout_fd = STDOUT_FILENO, stderr_fd = STDERR_FILENO;
+FILE *stdin = (FILE *)&stdin_fd, *stdout = (FILE *)&stdout_fd, *stderr = (FILE *)&stderr_fd;
 
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ PROTOTYPES ====================================*/
+
+extern const vsf_linux_fd_op_t __vsf_linux_fs_fdop;
+
 /*============================ IMPLEMENTATION ================================*/
+
+static int __get_fd(FILE *f)
+{
+    if (stdin == f) {
+        return STDIN_FILENO;
+    } else if (stdout == f) {
+        return STDOUT_FILENO;
+    } else if (stderr == f) {
+        return STDERR_FILENO;
+    } else {
+        vsf_linux_fd_t *sfd = (vsf_linux_fd_t *)f;
+        VSF_LINUX_ASSERT(&__vsf_linux_fs_fdop == sfd->op);
+        return sfd->fd;
+    }
+}
 
 int getchar(void)
 {
-    int ch;
+    int ch = EOF;
     fread(&ch, 1, 1, stdin);
     return ch;
 }
 
+FILE * fopen(const char *filename, const char *mode)
+{
+    int fd = open(filename, 0);
+    if (fd < 0) {
+        return NULL;
+    }
+    return (FILE *)vsf_linux_get_fd(fd);
+}
+
+int fclose(FILE *f)
+{
+    int fd = __get_fd(f);
+    if (fd < 0) {
+        return EOF;
+    }
+
+    int err = close(fd);
+    return err != 0 ? EOF : 0;
+}
+
+int fseek(FILE *f, long offset, int fromwhere)
+{
+    int fd = __get_fd(f);
+    if (fd < 0) {
+        return -1;
+    }
+    return lseek(fd, offset, fromwhere);
+}
+
+#if __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-align"
+#endif
+
+long ftell(FILE *f)
+{
+    vsf_linux_fd_t *sfd = (vsf_linux_fd_t *)f;
+    VSF_LINUX_ASSERT(&__vsf_linux_fs_fdop == sfd->op);
+    vsf_linux_fs_priv_t *priv = (vsf_linux_fs_priv_t *)sfd->priv;
+
+    return (long)priv->pos;
+}
+
+void rewind(FILE *f)
+{
+    vsf_linux_fd_t *sfd = (vsf_linux_fd_t *)f;
+    VSF_LINUX_ASSERT(&__vsf_linux_fs_fdop == sfd->op);
+    vsf_linux_fs_priv_t *priv = (vsf_linux_fs_priv_t *)sfd->priv;
+
+    priv->pos = 0;
+}
+
+#if __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#endif
+
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
 {
-    int fd;
     ssize_t ret;
-
-    if (f == stdout) {
-        fd = STDOUT_FILENO;
-    } else if (f == stderr) {
-        fd = STDERR_FILENO;
-    } else {
-//        fd = ;
+    int fd = __get_fd(f);
+    if (fd < 0) {
+        return EOF;
     }
+
     ret = write(fd, (void *)ptr, size * nmemb);
     if (ret < 0) {
         ret = 0;
@@ -69,21 +150,45 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
     return (size_t)ret;
 }
 
-size_t fread(const void *ptr, size_t size, size_t nmemb, FILE *f)
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *f)
 {
-    int fd;
     ssize_t ret;
-
-    if (f == stdin) {
-        fd = STDIN_FILENO;
-    } else {
-//        fd = ;
+    int fd = __get_fd(f);
+    if (fd < 0) {
+        return EOF;
     }
+
     ret = read(fd, (void *)ptr, size * nmemb);
     if (ret < 0) {
         ret = 0;
     }
     return (size_t)ret;
+}
+
+char * fgets(char *str, int n, FILE *f)
+{
+    char *result = str;
+    int rsize = 0;
+
+    while (rsize < n - 1) {
+        if (fread(str, 1, 1, f) != 1) {
+            break;
+        }
+        rsize++;
+        str++;
+        if ('\n' == str[-1]) {
+            break;
+        }
+    }
+    str[0] = '\0';
+    return rsize > 0 ? result : NULL;
+}
+
+// insecure
+char * gets(char *str)
+{
+    VSF_LINUX_ASSERT(false);
+    return NULL;
 }
 
 int fputs(const char *str, FILE *f)
@@ -131,4 +236,4 @@ void perror(const char *str)
 }
 #endif
 
-#endif      // VSF_USE_LINUX
+#endif      // VSF_USE_LINUX && VSF_LINUX_USE_SIMPLE_STDIO

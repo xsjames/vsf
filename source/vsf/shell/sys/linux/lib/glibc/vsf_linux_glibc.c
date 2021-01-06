@@ -21,9 +21,14 @@
 
 #if VSF_USE_LINUX == ENABLED
 
-#define VSF_LINUX_INHERIT
-#include "../../vsf_linux.h"
-#include <errno.h>
+#define __VSF_LINUX_CLASS_INHERIT__
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED
+#   include "../../include/unistd.h"
+#   include "../../include/errno.h"
+#else
+#   include <unistd.h>
+#   include <errno.h>
+#endif
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -35,7 +40,7 @@
 
 void vsf_linux_glibc_init(void)
 {
-    
+
 }
 
 int __sync_pend(vsf_sync_t *sem)
@@ -50,16 +55,5 @@ int __sync_pend(vsf_sync_t *sem)
         }
     }
 }
-
-#ifndef __WIN__
-char * strdup(const char *str)
-{
-    char *newstr = malloc(strlen(str) + 1);
-    if (newstr != NULL) {
-        strcpy(newstr, str);
-    }
-    return newstr;
-}
-#endif
 
 #endif      // VSF_USE_LINUX

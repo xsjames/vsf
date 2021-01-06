@@ -20,21 +20,24 @@
 
 /*============================ INCLUDES ======================================*/
 #include "service/vsf_service_cfg.h"
+#include "utilities/vsf_utilities.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*============================ MACROS ========================================*/
 #ifndef VSF_USE_HEAP
 #   define VSF_USE_HEAP         ENABLED     //!< enable vsf_heap_t by default
 #endif
 
 #if VSF_USE_HEAP == ENABLED
+
 #   ifndef VSF_HEAP_SIZE
 #       define VSF_HEAP_SIZE    (128 * 1024)
 #   endif
-#endif
 
-#if VSF_USE_HEAP == ENABLED
 #if 0
-/*! \brief free a target memory which belongs to a bigger memory chunk previouly 
+/*! \brief free a target memory which belongs to a bigger memory chunk previouly
  *!        allocated from the heap
  */
 #define vsf_heap_free_ex(                                                       \
@@ -70,6 +73,11 @@ extern const i_heap_t VSF_HEAP;
 /*============================ PROTOTYPES ====================================*/
 
 extern void vsf_heap_init(void);
+
+/*!\note:This interface cannot add multiple misaligned spaces.
+ *!\when a user needs to add space multiple times,
+ *!\the space provided each time (including the first time) must be aligned according to the agreed alignment standard.
+*/
 extern void vsf_heap_add(uint8_t *heap, uint_fast32_t size);
 extern void vsf_heap_add_memory(vsf_mem_t mem);
 extern void * vsf_heap_malloc_aligned(uint_fast32_t size, uint_fast32_t alignment);
@@ -85,9 +93,14 @@ extern void vsf_heap_free(void *buffer);
  *! \retval true the free access is sucessful
  *! \retval false the free access failed.
  */
-extern bool vsf_heap_partial_free(  void *buffer,       
-                                    uint_fast32_t pos, 
+extern bool vsf_heap_partial_free(  void *buffer,
+                                    uint_fast32_t pos,
                                     uint_fast32_t size);
 
 #endif
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

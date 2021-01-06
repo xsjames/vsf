@@ -22,29 +22,33 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if VSF_USE_USB_DEVICE == ENABLED && VSF_USE_USB_DEVICE_HID == ENABLED
+#if VSF_USE_USB_DEVICE == ENABLED && VSF_USBD_USE_HID == ENABLED
 
 #include "../../../common/class/HID/vsf_usb_HID.h"
 
-#if     defined(VSF_USBD_HID_IMPLEMENT)
-#   define __PLOOC_CLASS_IMPLEMENT
-#   undef VSF_USBD_HID_IMPLEMENT
-#elif   defined(VSF_USBD_HID_INHERIT)
-#   define __PLOOC_CLASS_INHERIT
-#   undef VSF_USBD_HID_INHERIT
+#if     defined(__VSF_USBD_HID_CLASS_IMPLEMENT)
+#   undef __VSF_USBD_HID_CLASS_IMPLEMENT
+#   define __PLOOC_CLASS_IMPLEMENT__
+#elif   defined(__VSF_USBD_HID_CLASS_INHERIT)
+#   undef __VSF_USBD_HID_CLASS_INHERIT
+#   define __PLOOC_CLASS_INHERIT__
 #endif
 #include "utilities/ooc_class.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*============================ MACROS ========================================*/
 
-#define VSF_USBD_DESC_HID_REPORT(__ptr, __size)                                 \
-    {USB_HID_DT_REPORT, 0, 0, (__size), (uint8_t*)(__ptr)}
+#define VSF_USBD_DESC_HID_REPORT(__PTR, __SIZE)                                 \
+    {USB_HID_DT_REPORT, 0, 0, (__SIZE), (uint8_t*)(__PTR)}
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-declare_simple_class(vk_usbd_hid_t)
-declare_simple_class(vk_usbd_hid_report_t)
+dcl_simple_class(vk_usbd_hid_t)
+dcl_simple_class(vk_usbd_hid_report_t)
 
 def_simple_class(vk_usbd_hid_report_t) {
 
@@ -99,7 +103,7 @@ def_simple_class(vk_usbd_hid_t) {
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
-extern const vk_usbd_class_op_t vk_usbd_HID;
+extern const vk_usbd_class_op_t vk_usbd_hid;
 
 /*============================ PROTOTYPES ====================================*/
 
@@ -107,5 +111,9 @@ extern bool vk_usbh_hid_in_report_can_update(vk_usbd_hid_report_t *report);
 extern void vk_usbd_hid_in_report_changed(vk_usbd_hid_t *hid, vk_usbd_hid_report_t *report);
 extern void vk_usbh_hid_out_report_processed(vk_usbd_hid_t *hid, vk_usbd_hid_report_t *report);
 
-#endif      // VSF_USE_USB_DEVICE && VSF_USE_USB_DEVICE_HID
+#ifdef __cplusplus
+}
+#endif
+
+#endif      // VSF_USE_USB_DEVICE && VSF_USBD_USE_HID
 #endif      // __VSF_USBD_HID_H__

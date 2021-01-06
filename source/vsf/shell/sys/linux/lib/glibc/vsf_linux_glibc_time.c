@@ -19,12 +19,17 @@
 
 #include "../../vsf_linux_cfg.h"
 
-#if VSF_USE_LINUX == ENABLED
+#if VSF_USE_LINUX == ENABLED && VSF_LINUX_USE_SIMPLE_TIME == ENABLED
 
-#include "../../vsf_linux.h"
-
-#include "vsf.h"
-#include <sys/time.h>
+#if VSF_LINUX_CFG_RELATIVE_PATH == ENABLED
+#   include "../../include/unistd.h"
+#   include "../../include/simple_libc/time.h"
+#   include "../../include/sys/time.h"
+#else
+#   include <unistd.h>
+#   include <time.h>
+#   include <sys/time.h>
+#endif
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -33,21 +38,6 @@
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ PROTOTYPES ====================================*/
 /*============================ IMPLEMENTATION ================================*/
-
-// TODO: wakeup after signal
-
-void usleep(int usec)
-{
-    vsf_teda_set_timer_us(usec);
-    vsf_thread_wfe(VSF_EVT_TIMER);
-}
-
-unsigned sleep(unsigned sec)
-{
-    vsf_teda_set_timer_ms(sec * 1000);
-    vsf_thread_wfe(VSF_EVT_TIMER);
-    return 0;
-}
 
 int nanosleep(const struct timespec *requested_time, struct timespec *remaining)
 {
@@ -64,11 +54,16 @@ int nanosleep(const struct timespec *requested_time, struct timespec *remaining)
     return 0;
 }
 
+clock_t clock(void)
+{
+    return vsf_systimer_get_us();
+}
+
 int clock_gettime(clockid_t clk_id, struct timespec *tp)
 {
     switch (clk_id) {
     case CLOCK_MONOTONIC: {
-            uint_fast32_t us = vsf_systimer_tick_to_us(vsf_timer_get_tick());
+            uint_fast32_t us = vsf_systimer_get_us();
             tp->tv_sec = us / 1000000;
             tp->tv_nsec = us * 1000;
         }
@@ -87,14 +82,25 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
     return 0;
 }
 
+#if __IS_COMPILER_LLVM__
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wvisibility"
+#endif
+
 int getitimer(int which, struct itimerval *curr_value)
 {
     VSF_LINUX_ASSERT(false);
+    return -1;
 }
 
 int setitimer(int which, const struct itimerval *new_valie, struct itimerval *old_value)
 {
     VSF_LINUX_ASSERT(false);
+    return -1;
 }
 
-#endif      // VSF_USE_LINUX
+#if __IS_COMPILER_LLVM__
+#   pragma clang diagnostic pop
+#endif
+
+#endif      // VSF_USE_LINUX && VSF_LINUX_USE_SIMPLE_TIME

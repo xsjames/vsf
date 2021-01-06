@@ -17,17 +17,17 @@
 
 /*============================ INCLUDES ======================================*/
 
-#include "component/mal/vsf_mal_cfg.h"
+#include "./vsf_mal_cfg.h"
 
 #if VSF_USE_MAL == ENABLED
 
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
-#   define VSFSTREAM_CLASS_INHERIT
+#if VSF_USE_SIMPLE_STREAM == ENABLED
+#   define __VSF_SIMPLE_STREAM_CLASS_INHERIT__
+#   include "service/vsf_service.h"
 #endif
-#define VSF_MAL_IMPLEMENT
 
-// TODO: use dedicated include
-#include "vsf.h"
+#define __VSF_MAL_CLASS_IMPLEMENT
+#include "./vsf_mal.h"
 
 /*============================ MACROS ========================================*/
 
@@ -35,17 +35,19 @@
 #   error VSF_KERNEL_CFG_EDA_SUPPORT_SUB_CALL is needed to use scsi
 #endif
 
-#if VSF_USE_KERNEL_SIMPLE_SHELL != ENABLED
-#   error VSF_USE_KERNEL_SIMPLE_SHELL must be enabled
+#if VSF_KERNEL_USE_SIMPLE_SHELL != ENABLED
+#   error VSF_KERNEL_USE_SIMPLE_SHELL must be enabled
 #endif
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
+#if VSF_USE_SIMPLE_STREAM == ENABLED
 enum {
     VSF_EVT_MAL_READ        = VSF_EVT_USER + 0,
     VSF_EVT_MAL_WRITE       = VSF_EVT_USER + 1,
 };
+#endif
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ LOCAL VARIABLES ===============================*/
@@ -54,14 +56,18 @@ enum {
 
 vsf_err_t vk_mal_init(vk_mal_t *pthis)
 {
+    vsf_err_t err;
     VSF_MAL_ASSERT((pthis != NULL) && (pthis->drv != NULL) && (pthis->drv->init != NULL));
-    return __vsf_call_eda((uintptr_t)pthis->drv->init, (uintptr_t)pthis);
+    __vsf_component_call_peda_ifs(vk_mal_init, err, pthis->drv->init, 0, pthis);
+    return err;
 }
 
 vsf_err_t vk_mal_fini(vk_mal_t *pthis)
 {
+    vsf_err_t err;
     VSF_MAL_ASSERT((pthis != NULL) && (pthis->drv != NULL) && (pthis->drv->fini != NULL));
-    return __vsf_call_eda((uintptr_t)pthis->drv->fini, (uintptr_t)pthis);
+    __vsf_component_call_peda_ifs(vk_mal_fini, err, pthis->drv->fini, 0, pthis);
+    return err;
 }
 
 uint_fast32_t vk_mal_blksz(vk_mal_t *pthis, uint_fast64_t addr, uint_fast32_t size, vsf_mal_op_t op)
@@ -82,162 +88,190 @@ bool vk_mal_prepare_buffer(vk_mal_t *pthis, uint_fast64_t addr, uint_fast32_t si
 // to erase all, size should be 0
 vsf_err_t vk_mal_erase(vk_mal_t *pthis, uint_fast64_t addr, uint_fast32_t size)
 {
+    vsf_err_t err;
     VSF_MAL_ASSERT((pthis != NULL) && (pthis->drv != NULL) && (pthis->drv->erase != NULL));
-    pthis->args.addr = addr;
-    pthis->args.size = size;
-    return __vsf_call_eda((uintptr_t)pthis->drv->erase, (uintptr_t)pthis);
+    __vsf_component_call_peda_ifs(vk_mal_erase, err, pthis->drv->erase, 0, pthis,
+        .addr       = addr,
+        .size       = size,
+    );
+    return err;
 }
 
 vsf_err_t vk_mal_read(vk_mal_t *pthis, uint_fast64_t addr, uint_fast32_t size, uint8_t *buff)
 {
+    vsf_err_t err;
     VSF_MAL_ASSERT((pthis != NULL) && (pthis->drv != NULL) && (pthis->drv->read != NULL));
-    pthis->args.addr = addr;
-    pthis->args.size = size;
-    pthis->args.buff = buff;
-    return __vsf_call_eda((uintptr_t)pthis->drv->read, (uintptr_t)pthis);
+    __vsf_component_call_peda_ifs(vk_mal_read, err, pthis->drv->read, 0, pthis,
+        .addr       = addr,
+        .size       = size,
+        .buff       = buff,
+    );
+    return err;
 }
 
 vsf_err_t vk_mal_write(vk_mal_t *pthis, uint_fast64_t addr, uint_fast32_t size, uint8_t *buff)
 {
+    vsf_err_t err;
     VSF_MAL_ASSERT((pthis != NULL) && (pthis->drv != NULL) && (pthis->drv->write != NULL));
-    pthis->args.addr = addr;
-    pthis->args.size = size;
-    pthis->args.buff = buff;
-    return __vsf_call_eda((uintptr_t)pthis->drv->write, (uintptr_t)pthis);
+    __vsf_component_call_peda_ifs(vk_mal_write, err, pthis->drv->write, 0, pthis,
+        .addr       = addr,
+        .size       = size,
+        .buff       = buff,
+    );
+    return err;
 }
 
-vsf_err_t vk_mal_get_result(vk_mal_t *pthis, uint32_t *size)
-{
-    VSF_MAL_ASSERT(pthis != NULL);
-    if (size != NULL) {
-        *size = pthis->result.size;
-    }
-    return pthis->result.errcode;
-}
-
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+#if VSF_USE_SIMPLE_STREAM == ENABLED
 static void __vk_mal_stream_tx_evthandler(void *param, vsf_stream_evt_t evt)
 {
-    vk_mal_t *pthis = (vk_mal_t *)param;
-    vsf_stream_t *stream = pthis->stream.stream;
+    vk_mal_stream_t *pthis = (vk_mal_stream_t *)param;
+    vk_mal_t *mal = pthis->mal;
+    vsf_stream_t *stream = pthis->stream;
 
     switch (evt) {
     case VSF_STREAM_ON_CONNECT:
     case VSF_STREAM_ON_OUT:
-        if (pthis->stream.size > 0) {
-            pthis->args.size = vsf_stream_get_wbuf(stream, &pthis->args.buff);
-            if (pthis->args.size < vk_mal_blksz(pthis, pthis->stream.addr, 0, VSF_MAL_OP_READ)) {
+        if (pthis->size > 0) {
+            pthis->cur_size = vsf_stream_get_wbuf(stream, &pthis->cur_buff);
+            if (pthis->cur_size < vk_mal_blksz(mal, pthis->addr, 0, VSF_MAL_OP_READ)) {
                 break;
             }
 
-            vsf_eda_post_evt(pthis->stream.cur_eda, VSF_EVT_MAL_READ);
+            vsf_eda_post_evt(pthis->cur_eda, VSF_EVT_MAL_READ);
         }
         break;
     }
-}
-
-static void __vk_mal_read_stream_do(uintptr_t target, vsf_evt_t evt)
-{
-    vk_mal_t *pthis = (vk_mal_t *)target;
-    vsf_stream_t *stream = pthis->stream.stream;
-
-    switch (evt) {
-    case VSF_EVT_INIT:
-        pthis->stream.rw_size = 0;
-        pthis->stream.cur_eda = vsf_eda_get_cur();
-        stream->tx.param = pthis;
-        stream->tx.evthandler = __vk_mal_stream_tx_evthandler;
-        vsf_stream_connect_tx(stream);
-        break;
-    case VSF_EVT_RETURN:
-        if (VSF_ERR_NONE == pthis->result.errcode) {
-            pthis->stream.size -= pthis->result.size;
-            pthis->stream.addr += pthis->result.size;
-            pthis->stream.rw_size += pthis->result.size;
-            vsf_stream_write(stream, NULL, pthis->result.size);
-        }
-        if ((pthis->result.errcode != VSF_ERR_NONE) || !pthis->stream.size) {
-            pthis->result.size = pthis->stream.rw_size;
-            vsf_stream_disconnect_tx(stream);
-            vsf_eda_return();
-        }
-        break;
-    case VSF_EVT_MAL_READ:
-        pthis->args.size = min(pthis->args.size, pthis->stream.size);
-        vk_mal_read(pthis, pthis->stream.addr, pthis->args.size, pthis->args.buff);
-        break;
-    }
-}
-
-vsf_err_t vk_mal_read_stream(vk_mal_t *pthis, uint_fast64_t addr, uint_fast32_t size, vsf_stream_t *stream)
-{
-    VSF_MAL_ASSERT(pthis != NULL);
-    pthis->stream.addr = addr;
-    pthis->stream.size = size;
-    pthis->stream.stream = stream;
-    return __vsf_call_eda((uintptr_t)__vk_mal_read_stream_do, (uintptr_t)pthis);
 }
 
 static void __vk_mal_stream_rx_evthandler(void *param, vsf_stream_evt_t evt)
 {
-    vk_mal_t *pthis = (vk_mal_t *)param;
-    vsf_stream_t *stream = pthis->stream.stream;
+    vk_mal_stream_t *pthis = (vk_mal_stream_t *)param;
+    vk_mal_t *mal = pthis->mal;
+    vsf_stream_t *stream = pthis->stream;
 
     switch (evt) {
     case VSF_STREAM_ON_CONNECT:
     case VSF_STREAM_ON_IN:
-        if (pthis->stream.size > 0) {
-            pthis->args.size = vsf_stream_get_rbuf(stream, &pthis->args.buff);
-            if (pthis->args.size < vk_mal_blksz(pthis, pthis->stream.addr, 0, VSF_MAL_OP_WRITE)) {
+        if (pthis->size > 0) {
+            pthis->cur_size = vsf_stream_get_rbuf(stream, &pthis->cur_buff);
+            if (pthis->cur_size < vk_mal_blksz(mal, pthis->addr, 0, VSF_MAL_OP_WRITE)) {
                 break;
             }
 
-            vsf_eda_post_evt(pthis->stream.cur_eda, VSF_EVT_MAL_WRITE);
+            vsf_eda_post_evt(pthis->cur_eda, VSF_EVT_MAL_WRITE);
         }
         break;
     }
 }
 
-static void __vk_mal_write_stream_do(uintptr_t target, vsf_evt_t evt)
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-align"
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wcast-align"
+#endif
+
+__vsf_component_peda_private_entry(__vk_mal_read_stream)
 {
-    vk_mal_t *pthis = (vk_mal_t *)target;
-    vsf_stream_t *stream = pthis->stream.stream;
+    vsf_peda_begin();
+    vk_mal_stream_t *pthis = (vk_mal_stream_t *)&vsf_this;
+    vk_mal_t *mal = pthis->mal;
+    vsf_stream_t *stream = pthis->stream;
 
     switch (evt) {
     case VSF_EVT_INIT:
-        pthis->stream.rw_size = 0;
-        pthis->stream.cur_eda = vsf_eda_get_cur();
+        pthis->rw_size = 0;
+        pthis->cur_eda = vsf_eda_get_cur();
+        stream->tx.param = pthis;
+        stream->tx.evthandler = __vk_mal_stream_tx_evthandler;
+        vsf_stream_connect_tx(stream);
+        break;
+    case VSF_EVT_RETURN: {
+            int32_t result = (int32_t)vsf_eda_get_return_value();
+            if (result > 0) {
+                pthis->size -= result;
+                pthis->addr += result;
+                pthis->rw_size += result;
+                vsf_stream_write(stream, NULL, result);
+            }
+            if ((result <= 0) || !pthis->size) {
+                vsf_stream_disconnect_tx(stream);
+                vsf_eda_return(pthis->rw_size);
+            }
+        }
+        break;
+    case VSF_EVT_MAL_READ:
+        pthis->cur_size = min(pthis->cur_size, pthis->size);
+        vk_mal_read(mal, pthis->addr, pthis->cur_size, pthis->cur_buff);
+        break;
+    }
+    vsf_peda_end();
+}
+
+__vsf_component_peda_private_entry(__vk_mal_write_stream)
+{
+    vsf_peda_begin();
+    vk_mal_stream_t *pthis = (vk_mal_stream_t *)&vsf_this;
+    vk_mal_t *mal = pthis->mal;
+    vsf_stream_t *stream = pthis->stream;
+
+    switch (evt) {
+    case VSF_EVT_INIT:
+        pthis->rw_size = 0;
+        pthis->cur_eda = vsf_eda_get_cur();
         stream->rx.param = pthis;
         stream->rx.evthandler = __vk_mal_stream_rx_evthandler;
         vsf_stream_connect_rx(stream);
         break;
-    case VSF_EVT_RETURN:
-        if (VSF_ERR_NONE == pthis->result.errcode) {
-            pthis->stream.size -= pthis->result.size;
-            pthis->stream.addr += pthis->result.size;
-            pthis->stream.rw_size += pthis->result.size;
-            vsf_stream_read(stream, NULL, pthis->result.size);
-        }
-        if ((pthis->result.errcode != VSF_ERR_NONE) || !pthis->stream.size) {
-            pthis->result.size = pthis->stream.rw_size;
-            vsf_stream_disconnect_rx(stream);
-            vsf_eda_return();
+    case VSF_EVT_RETURN: {
+            int32_t result = (int32_t)vsf_eda_get_return_value();
+            if (result > 0) {
+                pthis->size -= result;
+                pthis->addr += result;
+                pthis->rw_size += result;
+                vsf_stream_read(stream, NULL, result);
+            }
+            if ((result <= 0) || !pthis->size) {
+                vsf_stream_disconnect_rx(stream);
+                vsf_eda_return(pthis->rw_size);
+            }
         }
         break;
     case VSF_EVT_MAL_WRITE:
-        pthis->args.size = min(pthis->args.size, pthis->stream.size);
-        vk_mal_write(pthis, pthis->stream.addr, pthis->args.size, pthis->args.buff);
+        pthis->cur_size = min(pthis->cur_size, pthis->size);
+        vk_mal_write(mal, pthis->addr, pthis->cur_size, pthis->cur_buff);
         break;
     }
+    vsf_peda_end();
 }
 
-vsf_err_t vk_mal_write_stream(vk_mal_t *pthis, uint_fast64_t addr, uint_fast32_t size, vsf_stream_t *stream)
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic pop
+#endif
+
+vsf_err_t vk_mal_read_stream(vk_mal_stream_t *pthis, uint_fast64_t addr, uint_fast32_t size, vsf_stream_t *stream)
 {
+    vsf_err_t err;
     VSF_MAL_ASSERT(pthis != NULL);
-    pthis->stream.addr = addr;
-    pthis->stream.size = size;
-    pthis->stream.stream = stream;
-    return __vsf_call_eda((uintptr_t)__vk_mal_write_stream_do, (uintptr_t)pthis);
+    pthis->addr = addr;
+    pthis->size = size;
+    pthis->stream = stream;
+    __vsf_component_call_peda(__vk_mal_read_stream, err, pthis)
+    return err;
+}
+
+vsf_err_t vk_mal_write_stream(vk_mal_stream_t *pthis, uint_fast64_t addr, uint_fast32_t size, vsf_stream_t *stream)
+{
+    vsf_err_t err;
+    VSF_MAL_ASSERT(pthis != NULL);
+    pthis->addr = addr;
+    pthis->size = size;
+    pthis->stream = stream;
+    __vsf_component_call_peda(__vk_mal_write_stream, err, pthis)
+    return err;
 }
 #endif
 

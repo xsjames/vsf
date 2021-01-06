@@ -21,10 +21,14 @@
 /*============================ INCLUDES ======================================*/
 #include "service/vsf_service_cfg.h"
 
-#if VSF_USE_SERVICE_STREAM == ENABLED
+#if VSF_USE_STREAM == ENABLED
 #include "./vsf_stream_base.h"
 #include "./vsf_stream_writer.h"
 #include "./vsf_stream_reader.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -33,6 +37,10 @@
 /*============================ PROTOTYPES ====================================*/
 
 extern void vsf_service_stream_init(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 #endif

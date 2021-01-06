@@ -21,14 +21,27 @@
 /*============================ INCLUDES ======================================*/
 #include "hal/vsf_hal_cfg.h"
 
+#include "hal/arch/vsf_arch.h"
+#include "utilities/vsf_utilities.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
+/*
+ *  if __VSF_HAL_XXXX_IS_REG_CLK_ASYNC__ is defined for some module, means
+ *    vsf_xxx_enable/vsf_xxx_disable will not succeed in one run. And user can
+ *    not call vsf_xxx_init before disabled. Or, user don't need to call
+ *    vsf_xxx_disable before re-initializing(by calling vsf_xxx_init).
+ */
+
 typedef struct peripheral_status_t peripheral_status_t;
 struct peripheral_status_t {
-    uint32_t    bIsBusy : 1;
-    uint32_t            : 31;
+    uint32_t    is_busy                 : 1;
+    uint32_t                            : 31;
 };
 
 
@@ -36,88 +49,86 @@ typedef struct peripheral_capability_t peripheral_capability_t;
 struct peripheral_capability_t {
     union {
         struct {
-            uint8_t bCanReadByte        : 1;
-            uint8_t bCanReadBlock       : 1;
-            uint8_t bSupportFIFO        : 1;
-            uint8_t bSupportDMA         : 1;
-            uint8_t bSupportISR         : 1;
-            uint8_t bRandomAccess       : 1;
+            uint8_t can_read_byte       : 1;
+            uint8_t can_read_block      : 1;
+            uint8_t support_fifo        : 1;
+            uint8_t support_dma         : 1;
+            uint8_t support_isr         : 1;
+            uint8_t random_access       : 1;
             uint8_t                     : 2;
         };
         uint8_t bCanRead;
     }Read;
-    
+
     union {
         struct {
-            uint8_t bCanWriteByte       : 1;
-            uint8_t bCanWriteBlock      : 1;
-            uint8_t bSupportFIFO        : 1;
-            uint8_t bSupportDMA         : 1;
-            uint8_t bSupportISR         : 1;
-            uint8_t bRandomAccess       : 1;
+            uint8_t can_write_byte      : 1;
+            uint8_t can_write_block     : 1;
+            uint8_t support_fifo        : 1;
+            uint8_t support_dma         : 1;
+            uint8_t support_isr         : 1;
+            uint8_t random_access       : 1;
             uint8_t                     : 2;
         };
-        uint8_t bCanRead;
+        uint8_t can_read;
     }Write;
-    
+
     union {
         struct {
-            /* Data Type: 2^(u6DataTypeSize) */
-            uint16_t u3DataTypeSize     : 3; 
+            /* Data Type: 2^(u3DataTypeSize) */
+            uint16_t u3_data_type_size  : 3;
 
             /* Block Size: 2^(u5BlockSize) */
-            uint16_t u5BlockSize        : 5;
+            uint16_t u5_block_size      : 5;
             uint16_t                    : 8;
         };
-        uint16_t hwInfo;
+        uint16_t info;
     }Feature;
 };
 
-//! \name class: peripheral_t
+//! \name interface: i_peripheral_t
 //! @{
-def_interface(peripheral_t)
-    peripheral_status_t (*Status)   (void);
-    fsm_rt_t            (*Unint)    (void);
+def_interface(i_peripheral_t)
+    peripheral_status_t     (*Status)       (void);
+    peripheral_capability_t (*Capability)   (void);
+    fsm_rt_t                (*Uninit)       (void);
     union {
-        fsm_rt_t        (*Enable)   (void);
-        fsm_rt_t        (*Open)     (void);
+        fsm_rt_t            (*Enable)       (void);
+        fsm_rt_t            (*Open)         (void);
     };
     union {
-        fsm_rt_t        (*Disable)  (void);
-        fsm_rt_t        (*Close)    (void);
+        fsm_rt_t            (*Disable)      (void);
+        fsm_rt_t            (*Close)        (void);
     };
-end_def_interface(peripheral_t)
+end_def_interface(i_peripheral_t)
 //! @}
 
 def_interface(vsf_async_block_access_t)
-    /*! \brief request a block read
-     *! \param pchBuffer    address of target memory
-     *! \param wSize        the size of the target memory
+    /*! \brief request a block access
+     *! \param buffer_ptr    address of target memory
+     *! \param u32_size        the size of the target memory
      *! \retval fsm_rt_cpl  The transaction is complete
-     *! \retval fsm_rt_asyn The transaction is handled asynchronousely, i.e. by 
+     *! \retval fsm_rt_asyn The transaction is handled asynchronousely, i.e. by
      *!                     DMA or by ISR or etc.
      *! \retval fsm_rt_on_going User should poll this API until fsm_rt_cpl or err
      *!                     value is returned.
      *! \retval vsf_err_t   Error value is returned.
      */
-    fsm_rt_t  (*RequestRead)(uint8_t *pchBuffer, uint_fast32_t wSize);
-    /*! \brief request a block write
-     *! \param pchBuffer    address of target memory
-     *! \param wSize        the size of the target memory
-     *! \retval fsm_rt_cpl  The transaction is complete
-     *! \retval fsm_rt_asyn The transaction is handled asynchronousely, i.e. by 
-     *!                     DMA or by ISR or etc.
-     *! \retval fsm_rt_on_going User should poll this API until fsm_rt_cpl or err
-     *!                     value is returned.
-     *! \retval vsf_err_t   Error value is returned.
-     */
-    fsm_rt_t  (*RequestWrite)(uint8_t *pchBuffer, uint_fast32_t wSize);
+    vsf_err_t               (*Request)(uint8_t *buffer_ptr, uint_fast32_t size);
+
+    /*! \brief cancel on going communication */
+    vsf_err_t               (*Cancel) (void);
+
+    /*! \brief get transfered count */
+    int_fast32_t            (*GetTransferredCount)(void);
 end_def_interface(vsf_async_block_access_t)
 
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ PROTOTYPES ====================================*/
 
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif

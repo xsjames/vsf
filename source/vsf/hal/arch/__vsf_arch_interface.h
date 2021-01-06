@@ -22,6 +22,9 @@
 #include "hal/vsf_hal_cfg.h"
 #include "vsf_arch_abstraction.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /******************************************************************************
  * IMPORTANT: This header file can only be included by source code files      *
  *            within arch                                                     *
@@ -33,7 +36,7 @@
 //! @{
 #define VSF_SYSTIMER_IMPL_REQUEST_RESPONSE                      0
 #define VSF_SYSTIMER_IMPL_WITH_NORMAL_TIMER                     1
-#define VSF_SYSTIMER_IMPL_WITH_COMP_TIMER                       2              
+#define VSF_SYSTIMER_IMPL_WITH_COMP_TIMER                       2
 //!@}
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -46,7 +49,7 @@
  * APIs or Interfaces each Arch must use or implement                         *
  *----------------------------------------------------------------------------*/
 
-/*! \note initialize architecture specific service 
+/*! \note initialize architecture specific service
  *  \param none
  *  \retval true initialization succeeded.
  *  \retval false initialization failed
@@ -58,16 +61,23 @@ extern bool vsf_arch_low_level_init(void);
 /*----------------------------------------------------------------------------*
  * System Timer : Implement with Normal Timer (Count down or Count up)        *
  *----------------------------------------------------------------------------*/
-#   if VSF_SYSTIMER_CFG_IMPL_MODE == VSF_SYSTIMER_IMPL_WITH_NORMAL_TIMER       
+#   if VSF_SYSTIMER_CFG_IMPL_MODE == VSF_SYSTIMER_IMPL_WITH_NORMAL_TIMER
 
 /*-------------------------------------------*
  * APIs to be implemented by target arch     *
  *-------------------------------------------*/
-/*! \brief initialise systimer without enable it 
+/*! \brief initialise systimer without enable it
  */
 extern vsf_err_t vsf_systimer_low_level_init(uintmax_t ticks);
 
 /*! \brief disable systimer and return over-flow flag status
+ *!
+ *! \Note  IMPORTANT: If the timer peripheral automatically clear the over flow
+ *!        flag in register when interrupt is served, you have to create a
+ *!        software bit to simulate a flag. When the function
+ *!        vsf_systimer_low_level_disable() is called, it should return the flag
+ *!        status as boolean value and clear the software flag.
+ *!
  *! \param none
  *! \retval true  overflow happened
  *! \retval false no overflow happened
@@ -87,8 +97,12 @@ extern vsf_systimer_cnt_t vsf_systimer_get_tick_elapsed(void);
 /*-------------------------------------------*
  * APIs to be used by target arch            *
  *-------------------------------------------*/
-/*! \brief systimer overflow event handler which is called by target timer 
+/*! \brief systimer overflow event handler which is called by target timer
  *!        interrupt handler
+ *! \Note  IMPORTANT: If the timer peripheral automatically clear the over flow
+ *!        flag in register when interrupt is served, you have to create a
+ *!        software bit to simulate a flag which will be cleared by calling
+ *!        vsf_systimer_low_level_disable().
  */
 extern void vsf_systimer_ovf_evt_hanlder(void);
 #   endif
@@ -118,7 +132,7 @@ extern uint_fast32_t vsf_systimer_tick_to_ms(vsf_systimer_cnt_t tick);
 /*-------------------------------------------*
  * APIs to be used by target arch            *
  *-------------------------------------------*/
-/*! \brief systimer timeout event handler which is called by request response 
+/*! \brief systimer timeout event handler which is called by request response
  *!        service.
  */
 extern void vsf_systimer_timeout_evt_hanlder(vsf_systimer_cnt_t tick);
@@ -126,6 +140,11 @@ extern uint_fast32_t vsf_arch_req___systimer_freq___from_usr(void);
 extern uint_fast32_t vsf_arch_req___systimer_resolution___from_usr(void);
 #   endif
 #endif      // VSF_SYSTIMER_CFG_IMPL_MODE
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 /* EOF */

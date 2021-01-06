@@ -16,14 +16,20 @@
  ****************************************************************************/
 
 
-//! \note Top Level Configuration 
+
+//! \note Top Level Configuration
 
 #ifndef __VSF_H__
 #define __VSF_H__
 
+#if defined(__cplusplus) && !defined(__IAR_SYSTEMS_ICC__)
+#   define __STDC_VERSION__   201112L
+#endif
+
 /*============================ INCLUDES ======================================*/
 #include "vsf_cfg.h"
-#include "hal/vsf_hal.h"
+#include "utilities/vsf_utilities.h"
+#include "hal/arch/vsf_arch.h"
 #include "service/vsf_service.h"
 
 #if VSF_USE_KERNEL == ENABLED
@@ -31,10 +37,13 @@
 #endif
 
 #include "osa_service/vsf_osa_service.h"
+#include "hal/vsf_hal.h"
+// TODO: remove later
+#include "osa_hal/vsf_osa_hal.h"
 #include "component/vsf_component.h"
 
-#ifdef VSF_CFG_USER_HEADER
-#   include VSF_CFG_USER_HEADER
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 /*============================ MACROS ========================================*/
@@ -63,12 +72,64 @@
 #   endif
 #endif
 
+#if VSF_USE_TRACE == ENABLED
+#   if      defined(VSF_DEBUGGER_CFG_CONSOLE)                                   \
+        ||  (defined(VSF_HAL_USE_DEBUG_STREAM) && VSF_HAL_USE_DEBUG_STREAM == ENABLED)\
+        ||  defined(VSF_CFG_DEBUG_STREAM_TX_T)
+    // use default debug stream from debugger/hardware debug uart/user
+#       if VSF_USE_SIMPLE_STREAM == ENABLED
+#           define vsf_start_trace(...)                                         \
+                vsf_trace_init(((vsf_stream_t *)&VSF_DEBUG_STREAM_TX, ##__VA_ARGS__))
+#       elif VSF_USE_STREAM == ENABLED
+#           define vsf_start_trace(...)                                         \
+                vsf_trace_init(((vsf_stream_tx_t *)&VSF_DEBUG_STREAM_TX, ##__VA_ARGS__))
+#       endif
+#   else
+    // no default debug stream, user should define a stream
+#       if VSF_USE_SIMPLE_STREAM == ENABLED
+#           define vsf_start_trace(__stream)                                    \
+                vsf_trace_init((vsf_stream_t *)(__stream))
+#       elif VSF_USE_STREAM == ENABLED
+#           define vsf_start_trace(__stream)                                    \
+                vsf_trace_init((vsf_stream_tx_t *)(__stream))
+#       endif
+#   endif
+#endif
+
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 /*============================ GLOBAL VARIABLES ==============================*/
+
+#ifdef VSF_CFG_DEBUG_STREAM_TX_T
+extern VSF_CFG_DEBUG_STREAM_TX_T VSF_DEBUG_STREAM_TX;
+#endif
+
+#ifdef VSF_CFG_DEBUG_STREAM_RX_T
+extern VSF_CFG_DEBUG_STREAM_RX_T VSF_DEBUG_STREAM_RX;
+#endif
+
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ PROTOTYPES ====================================*/
 
+/*============================ INCLUDES ======================================*/
 
+/*£¡\note If you have one or more private header files with which you want to
+ *!       cover all the range where vsf.h is included directly or indirectly, you
+ *!       can define the macro VSF_CFG_USR_HEADER with a path string in
+ *!       vsf_usr_cfg.h.
+ *!
+ *!       e.g. some customised VSF contains a set of private definition, usually
+ *!            those private definitions are defined in a private header file and
+ *!            inserted here with VSF_CFG_USER_HEADER
+ *!       e.g. in some application scenarios, users want to insert some header file
+ *!            together with vsf.h, then it can be handled with VSF_CFG_USER_HEADER
+ */
+#ifdef VSF_CFG_USER_HEADER
+#   include VSF_CFG_USER_HEADER
+#endif
+
+#ifdef __cplusplus
+}
+#endif
 #endif
 /* EOF */

@@ -22,7 +22,7 @@
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 
-#define GENERATE_HEX(value)             TPASTE2(0x, value)
+#define GENERATE_HEX(value)             __CONNECT2(0x, value)
 
 
 
@@ -84,14 +84,14 @@ struct usbd_demo_t {
     struct {
         struct {
             vk_usbd_cdcacm_t param;
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+#if VSF_USE_SIMPLE_STREAM == ENABLED
             struct {
                 vsf_fifo_stream_t tx;
                 vsf_fifo_stream_t rx;
                 uint8_t tx_buffer[4 * 1024];
                 uint8_t rx_buffer[4 * 1024];
             } stream;
-#elif VSF_USE_SERVICE_STREAM == ENABLED
+#elif VSF_USE_STREAM == ENABLED
 #endif
         } cdc[2];
 
@@ -529,8 +529,8 @@ static const usbd_demo_const_t usbd_demo_const = {
             'V', 0, 'S', 0, 'F', 0, 'U', 0, 'V', 0, 'C', 0,
         },
         .std_desc               = {
-            VSF_USBD_DESC_DEVICE(0, usbd_demo_const.usbd.dev_desc, sizeof(usbd_demo_const.usbd.dev_desc)),
-            VSF_USBD_DESC_CONFIG(0, 0, usbd_demo_const.usbd.config_desc, sizeof(usbd_demo_const.usbd.config_desc)),
+            VSF_USBD_DESC_DEVICE(usbd_demo_const.usbd.dev_desc, sizeof(usbd_demo_const.usbd.dev_desc)),
+            VSF_USBD_DESC_CONFIG(0, usbd_demo_const.usbd.config_desc, sizeof(usbd_demo_const.usbd.config_desc)),
             VSF_USBD_DESC_STRING(0, 0, usbd_demo_const.usbd.str_lanid, sizeof(usbd_demo_const.usbd.str_lanid)),
             VSF_USBD_DESC_STRING(0x0409, 1, usbd_demo_const.usbd.str_vendor, sizeof(usbd_demo_const.usbd.str_vendor)),
             VSF_USBD_DESC_STRING(0x0409, 2, usbd_demo_const.usbd.str_product, sizeof(usbd_demo_const.usbd.str_product)),
@@ -596,7 +596,7 @@ static usbd_demo_t usbd_demo = {
                     .parity     = 0,
                     .datalen    = 8,
                 },
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+#if VSF_USE_SIMPLE_STREAM == ENABLED
                 .stream.tx.stream = (vsf_stream_t *)&usbd_demo.usbd.cdc[0].stream.tx,
                 .stream.rx.stream = (vsf_stream_t *)&usbd_demo.usbd.cdc[0].stream.rx,
             },
@@ -626,7 +626,7 @@ static usbd_demo_t usbd_demo = {
                     .parity     = 0,
                     .datalen    = 8,
                 },
-#if VSF_USE_SERVICE_VSFSTREAM == ENABLED
+#if VSF_USE_SIMPLE_STREAM == ENABLED
                 .stream.tx.stream = (vsf_stream_t *)&usbd_demo.usbd.cdc[1].stream.tx,
                 .stream.rx.stream = (vsf_stream_t *)&usbd_demo.usbd.cdc[1].stream.rx,
             },

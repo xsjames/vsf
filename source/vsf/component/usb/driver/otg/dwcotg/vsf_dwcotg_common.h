@@ -22,13 +22,16 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if     (VSF_USE_USB_DEVICE == ENABLED && VSF_USE_USB_DEVICE_DCD_DWCOTG == ENABLED)\
-    ||  (VSF_USE_USB_HOST == ENABLED && VSF_USE_USB_HOST_HCD_DWCOTG == ENABLED)
+#if     (VSF_USE_USB_DEVICE == ENABLED && VSF_USBD_USE_DCD_DWCOTG == ENABLED)\
+    ||  (VSF_USE_USB_HOST == ENABLED && VSF_USBH_USE_HCD_DWCOTG == ENABLED)
 
 #include "hal/vsf_hal.h"
-#include "hal/interface/vsf_interface_usb.h"
 
 #include "./vsf_dwcotg_hw.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 
@@ -43,22 +46,22 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct vk_dwcotg_param_t {
+typedef struct vk_dwcotg_param_t {
     union {
         struct {
             uint8_t speed : 4;
             uint8_t ulpi_en : 1;
             uint8_t utmi_en : 1;
             uint8_t vbus_en : 1;
+            uint8_t dma_en  : 1;
         };
         uint8_t feature;
     };
-};
-typedef struct vk_dwcotg_param_t vk_dwcotg_param_t;
+} vk_dwcotg_param_t;
 
-struct vk_dwcotg_reg_t {
+typedef struct vk_dwcotg_reg_t {
     // Core Global registers starting at offset 000h
-	struct dwcotg_core_global_regs_t *global_regs;
+    struct dwcotg_core_global_regs_t *global_regs;
     union {
         struct {
             // Host Global Registers starting at offset 400h.
@@ -80,14 +83,12 @@ struct vk_dwcotg_reg_t {
         } dev;
     };
     uint32_t * dfifo[VSF_DWCOTG_DCD_CFG_EP_NUM];
-};
-typedef struct vk_dwcotg_reg_t vk_dwcotg_reg_t;
+} vk_dwcotg_reg_t;
 
-struct vk_dwcotg_t {
+typedef struct vk_dwcotg_t {
     vk_dwcotg_reg_t reg;
     uint8_t ep_num;
-};
-typedef struct vk_dwcotg_t vk_dwcotg_t;
+} vk_dwcotg_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ INCLUDES ======================================*/
@@ -96,6 +97,10 @@ typedef struct vk_dwcotg_t vk_dwcotg_t;
 void vk_dwcotg_phy_init(vk_dwcotg_t *dwcotg,
                         const vk_dwcotg_param_t *param,
                         vk_dwcotg_hw_info_t *hw_info);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 #endif

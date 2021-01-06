@@ -20,6 +20,10 @@
 #ifndef __VSF_USB_MSC_H__
 #define __VSF_USB_MSC_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*============================ INCLUDES ======================================*/
 /*============================ MACROS ========================================*/
 
@@ -29,6 +33,7 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
+typedef struct usb_msc_cbw_t usb_msc_cbw_t;
 struct usb_msc_cbw_t {
     uint32_t dCBWSignature;
     uint32_t dCBWTag;
@@ -38,30 +43,31 @@ struct usb_msc_cbw_t {
     uint8_t bCBWCBLength;
     uint8_t CBWCB[16];
 } PACKED;
-typedef struct usb_msc_cbw_t usb_msc_cbw_t;
 
+typedef struct usb_msc_csw_t usb_msc_csw_t;
 struct usb_msc_csw_t {
     uint32_t dCSWSignature;
     uint32_t dCSWTag;
     uint32_t dCSWDataResidue;
     uint8_t dCSWStatus;
 } PACKED;
-typedef struct usb_msc_csw_t usb_msc_csw_t;
 
-enum usb_msc_req_t {
+typedef enum usb_msc_req_t {
     USB_MSC_REQ_GET_MAX_LUN = 0xFE,
     USB_MSC_REQ_RESET       = 0xFF,
-};
-typedef enum usb_msc_req_t usb_msc_req_t;
+} usb_msc_req_t;
 
-enum usb_msc_csw_status_t {
+typedef enum usb_msc_csw_status_t {
     USB_MSC_CSW_OK          = 0,
     USB_MSC_CSW_FAIL        = 1,
     USB_MSC_CSW_PHASE_ERROR = 2,
-};
-typedef enum usb_msc_csw_status_t usb_msc_csw_status_t;
+} usb_msc_csw_status_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ PROTOTYPES ====================================*/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif    // __VSF_USB_MSC_H__

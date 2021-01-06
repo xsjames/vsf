@@ -42,8 +42,8 @@
     <ClInclude Include="..\..\..\vsf\component\mal\driver\mim_mal\vsf_mim_mal.h" />
     <ClInclude Include="..\..\..\vsf\component\mal\vsf_mal.h" />
     <ClInclude Include="..\..\..\vsf\component\mal\vsf_mal_cfg.h" />
-    <ClInclude Include="..\..\..\vsf\component\ui\disp_drv\sdl2\vsf_disp_drv_sdl2.h" />
-    <ClInclude Include="..\..\..\vsf\component\ui\disp_drv\vsf_disp_drv.h" />
+    <ClInclude Include="..\..\..\vsf\component\ui\disp\driver\sdl2\vsf_disp_sdl2.h" />
+    <ClInclude Include="..\..\..\vsf\component\ui\disp\vsf_disp.h" />
     <ClInclude Include="..\..\..\vsf\component\ui\vsf_ui_cfg.h" />
     <ClInclude Include="..\..\..\vsf\component\usb\common\class\CDC\vsf_usb_CDC.h" />
     <ClInclude Include="..\..\..\vsf\component\usb\common\class\CDC\vsf_usb_CDCACM.h" />
@@ -54,7 +54,6 @@
     <ClInclude Include="..\..\..\vsf\component\usb\common\class\UVC\vsf_usb_UVC.h" />
     <ClInclude Include="..\..\..\vsf\component\usb\common\class\XB1\vsf_usb_xb1.h" />
     <ClInclude Include="..\..\..\vsf\component\usb\common\usb_common.h" />
-    <ClInclude Include="..\..\..\vsf\component\usb\driver\hcd\libusb_hcd\vsf_libusb_hcd.h" />
     <ClInclude Include="..\..\..\vsf\component\usb\driver\hcd\winusb_hcd\vsf_winusb_hcd.h" />
     <ClInclude Include="..\..\..\vsf\component\usb\host\class\BTHCI\vsf_usbh_BTHCI.h" />
     <ClInclude Include="..\..\..\vsf\component\usb\host\class\CDC\vsf_usbh_CDC.h" />
@@ -184,9 +183,8 @@
     <ClCompile Include="..\..\..\vsf\component\mal\driver\mem_mal\vsf_mem_mal.c" />
     <ClCompile Include="..\..\..\vsf\component\mal\driver\mim_mal\vsf_mim_mal.c" />
     <ClCompile Include="..\..\..\vsf\component\mal\vsf_mal.c" />
-    <ClCompile Include="..\..\..\vsf\component\ui\disp_drv\sdl2\vsf_disp_drv_sdl2.c" />
-    <ClCompile Include="..\..\..\vsf\component\ui\disp_drv\vsf_disp_drv.c" />
-    <ClCompile Include="..\..\..\vsf\component\usb\driver\hcd\libusb_hcd\vsf_libusb_hcd.c" />
+    <ClCompile Include="..\..\..\vsf\component\ui\disp\driver\sdl2\vsf_disp_sdl2.c" />
+    <ClCompile Include="..\..\..\vsf\component\ui\disp\vsf_disp.c" />
     <ClCompile Include="..\..\..\vsf\component\usb\driver\hcd\winusb_hcd\vsf_winusb_hcd.c" />
     <ClCompile Include="..\..\..\vsf\component\usb\host\class\BTHCI\vsf_usbh_BTHCI.c" />
     <ClCompile Include="..\..\..\vsf\component\usb\host\class\CDC\vsf_usbh_CDC.c" />
@@ -327,7 +325,8 @@
       <PreprocessorDefinitions>__VSF__;__CPU_X86__;__WIN__;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\vsf;$(ProjectDir)..\..\usrapp\linux_demo;$(ProjectDir)..\..\usrapp\linux_demo\config;$(ProjectDir)..\..\..\vsf\shell\sys\linux\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>-Wno-empty-body -Wno-microsoft-anon-tag -Wno-int-conversion -Wno-int-to-pointer-cast -Wno-missing-braces -Wno-pragma-pack -Wno-deprecated-declarations -Wno-unused-variable  -Wno-bitfield-constant-conversion -Wno-sometimes-uninitialized -Wno-unused-function -Wno-switch -Wno-pointer-integer-compare -fms-extensions %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-fms-extensions -fmacro-backtrace-limit=0  -Wno-microsoft-include %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

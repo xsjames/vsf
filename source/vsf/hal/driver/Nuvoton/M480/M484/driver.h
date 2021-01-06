@@ -16,9 +16,9 @@
  ****************************************************************************/
 
 #if defined(__VSF_HEADER_ONLY_SHOW_ARCH_INFO__)
-#   include "hal/vsf_hal_cfg.h"
-#   include "./device.h"
-#   undef   __VSF_HEADER_ONLY_SHOW_ARCH_INFO__
+
+#   include "../__device.h"
+
 #else
 
 #   ifndef __HAL_DRIVER_NUVOTON_M484_H__
@@ -27,6 +27,7 @@
 /*============================ INCLUDES ======================================*/
 #       include "hal/vsf_hal_cfg.h"
 #       include "./device.h"
+#       include "./interrupt_swi.h"
 #       include "../common/io/io.h"
 #       include "../common/usb/usb.h"
 #       include "../common/pm/pm.h"

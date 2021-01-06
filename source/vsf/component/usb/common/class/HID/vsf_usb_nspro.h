@@ -19,10 +19,18 @@
 #define __VSF_USB_NSPRO_H__
 
 /*============================ INCLUDES ======================================*/
+
+#include "utilities/vsf_utilities.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
+typedef struct vsf_usb_nspro_gamepad_in_report_common_t vsf_usb_nspro_gamepad_in_report_common_t;
 struct vsf_usb_nspro_gamepad_in_report_common_t {
     uint8_t id;         // 0x21/0x30/0x31
     uint8_t tick;
@@ -83,8 +91,8 @@ struct vsf_usb_nspro_gamepad_in_report_common_t {
     // Vibrator input report. Decides if next vibration pattern should be sent. 12
     uint8_t vivrator;
 } PACKED;
-typedef struct vsf_usb_nspro_gamepad_in_report_common_t vsf_usb_nspro_gamepad_in_report_common_t;
 
+typedef struct vsf_usb_nspro_gamepad_in_report_full_t vsf_usb_nspro_gamepad_in_report_full_t;
 struct vsf_usb_nspro_gamepad_in_report_full_t {
     implement(vsf_usb_nspro_gamepad_in_report_common_t)
 
@@ -97,21 +105,24 @@ struct vsf_usb_nspro_gamepad_in_report_full_t {
         uint16_t yaw;
     } PACKED gyro_acc[3];
 } PACKED;
-typedef struct vsf_usb_nspro_gamepad_in_report_full_t vsf_usb_nspro_gamepad_in_report_full_t;
 
+typedef struct vsf_usb_nspro_gamepad_in_report_t vsf_usb_nspro_gamepad_in_report_t;
 struct vsf_usb_nspro_gamepad_in_report_t {
     implement(vsf_usb_nspro_gamepad_in_report_full_t)
     uint8_t zero[15];   // fill data to make 64 bytes report
 } PACKED;
-typedef struct vsf_usb_nspro_gamepad_in_report_t vsf_usb_nspro_gamepad_in_report_t;
 
+typedef struct vsf_usb_nspro_gamepad_out_report_t vsf_usb_nspro_gamepad_out_report_t;
 struct vsf_usb_nspro_gamepad_out_report_t {
     uint8_t buffer[64];
 } PACKED;
-typedef struct vsf_usb_nspro_gamepad_out_report_t vsf_usb_nspro_gamepad_out_report_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ PROTOTYPES ====================================*/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif    // __VSF_USB_NSPRO_H__
 

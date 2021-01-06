@@ -22,19 +22,21 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if VSF_USE_USB_DEVICE == ENABLED && VSF_USE_USB_DEVICE_MSC == ENABLED
+#if VSF_USE_USB_DEVICE == ENABLED && VSF_USBD_USE_MSC == ENABLED
 
-#include "../../../common/class/MSC/vsf_usb_MSC.h"
+#include "component/usb/common/class/MSC/vsf_usb_MSC.h"
 #include "./vsf_usbd_MSC_desc.h"
+#include "component/scsi/vsf_scsi.h"
 
-#if     defined(VSF_USBD_MSC_IMPLEMENT)
-#   define __PLOOC_CLASS_IMPLEMENT
-#   undef VSF_USBD_MSC_IMPLEMENT
-#elif   defined(VSF_USBD_MSC_INHERIT)
-#   define __PLOOC_CLASS_INHERIT
-#   undef VSF_USBD_MSC_INHERIT
+#if     defined(__VSF_USBD_MSC_CLASS_IMPLEMENT)
+#   undef __VSF_USBD_MSC_CLASS_IMPLEMENT
+#   define __PLOOC_CLASS_IMPLEMENT__
 #endif
 #include "utilities/ooc_class.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 
@@ -53,40 +55,34 @@
 
 #define USB_MSC_IFS_NUM             1
 #define USB_MSCBOT_IFS_NUM          USB_MSC_IFS_NUM
-#define USB_MSC_IFS(__MSC_PARAM)                                                \
-            {                                                                   \
-                .class_op       = &vk_usbd_msc_class,                           \
-                .class_param  =  &(__MSC_PARAM),                                \
-            },
+#define USB_MSC_IFS(__MSC_PARAM)    USB_IFS(&vk_usbd_msc, &(__MSC_PARAM))
 
 
 
-#define __implement_mscbot_desc(__NAME, __IFS, __I_FUNC, __BULK_IN_EP, __BULK_OUT_EP, __BULK_EP_SIZE)\
-            USB_DESC_MSCBOT_IAD((__IFS), 4 + (__I_FUNC), (__BULK_IN_EP), (__BULK_OUT_EP), (__BULK_EP_SIZE))
+#define __mscbot_desc(__name, __ifs, __i_func, __bulk_in_ep, __bulk_out_ep, __bulk_ep_size)\
+            USB_DESC_MSCBOT_IAD((__ifs), 4 + (__i_func), (__bulk_in_ep), (__bulk_out_ep), (__bulk_ep_size))
 
-#define __implement_mscbot_func(__NAME, __FUNC_ID, __BULK_IN_EP, __BULK_OUT_EP, __MAX_LUN, __SCSI_DEV, __STREAM)\
-            vk_usbd_msc_t __##__NAME##_MSC##__FUNC_ID = {                       \
-                USB_MSC_PARAM((__BULK_IN_EP), (__BULK_OUT_EP), (__MAX_LUN), (__SCSI_DEV), (__STREAM))\
+#define __mscbot_func(__name, __func_id, __bulk_in_ep, __bulk_out_ep, __max_lun, __scsi_dev, __stream)\
+            vk_usbd_msc_t __##__name##_MSC##__func_id = {                       \
+                USB_MSC_PARAM((__bulk_in_ep), (__bulk_out_ep), (__max_lun), (__scsi_dev), (__stream))\
             };
 
-#define __implement_msc_ifs(__NAME, __FUNC_ID)                                  \
-                {                                                               \
-                    USB_MSC_IFS(__##__NAME##_MSC##__FUNC_ID)                    \
-                },
+#define __msc_ifs(__name, __func_id)                                            \
+            USB_MSC_IFS(__##__name##_MSC##__func_id)
 
-#define implement_mscbot_desc(__NAME, __IFS, __I_FUNC, __BULK_IN_EP, __BULK_OUT_EP, __BULK_EP_SIZE)\
-            __implement_mscbot_desc(__NAME, (__IFS), (__I_FUNC), (__BULK_IN_EP), (__BULK_OUT_EP), (__BULK_EP_SIZE))
-#define implement_mscbot_func(__NAME, __FUNC_ID, __BULK_IN_EP, __BULK_OUT_EP, __MAX_LUN, __SCSI_DEV, __STREAM)\
-            __implement_mscbot_func(__NAME, __FUNC_ID, (__BULK_IN_EP), (__BULK_OUT_EP), (__MAX_LUN), (__SCSI_DEV), (__STREAM))
-#define implement_mscbot_ifs(__NAME, __FUNC_ID)                                 \
-            __implement_msc_ifs(__NAME, __FUNC_ID)
+#define mscbot_desc(__name, __ifs, __i_func, __bulk_in_ep, __bulk_out_ep, __bulk_ep_size)\
+            __mscbot_desc(__name, (__ifs), (__i_func), (__bulk_in_ep), (__bulk_out_ep), (__bulk_ep_size))
+#define mscbot_func(__name, __func_id, __bulk_in_ep, __bulk_out_ep, __max_lun, __scsi_dev, __stream)\
+            __mscbot_func(__name, __func_id, (__bulk_in_ep), (__bulk_out_ep), (__max_lun), (__scsi_dev), (__stream))
+#define mscbot_ifs(__name, __func_id)                                           \
+            __msc_ifs(__name, __func_id)
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-declare_class(vk_usbd_msc_t)
+dcl_simple_class(vk_usbd_msc_t)
 
-union vk_usbd_msc_scsi_ctx_t {
+typedef union vk_usbd_msc_scsi_ctx_t {
     usb_msc_cbw_t cbw;
     struct {
         usb_msc_csw_t csw;
@@ -95,8 +91,7 @@ union vk_usbd_msc_scsi_ctx_t {
             uint32_t reply_size;
         };
     };
-};
-typedef union vk_usbd_msc_scsi_ctx_t vk_usbd_msc_scsi_ctx_t;
+} vk_usbd_msc_scsi_ctx_t;
 
 def_simple_class(vk_usbd_msc_t) {
 
@@ -120,9 +115,13 @@ def_simple_class(vk_usbd_msc_t) {
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
-extern const vk_usbd_class_op_t vk_usbd_msc_class;
+extern const vk_usbd_class_op_t vk_usbd_msc;
 
 /*============================ PROTOTYPES ====================================*/
 
-#endif      // VSF_USE_USB_DEVICE && VSF_USE_USB_DEVICE_MSC
+#ifdef __cplusplus
+}
+#endif
+
+#endif      // VSF_USE_USB_DEVICE && VSF_USBD_USE_MSC
 #endif      // __VSF_USBD_MSC_H__

@@ -1,3 +1,20 @@
+/****************************************************************************
+*  Copyright 2020 by Gorgon Meducer (Email:embedded_zhuoran@hotmail.com)    *
+*                                                                           *
+*  Licensed under the Apache License, Version 2.0 (the "License");          *
+*  you may not use this file except in compliance with the License.         *
+*  You may obtain a copy of the License at                                  *
+*                                                                           *
+*     http://www.apache.org/licenses/LICENSE-2.0                            *
+*                                                                           *
+*  Unless required by applicable law or agreed to in writing, software      *
+*  distributed under the License is distributed on an "AS IS" BASIS,        *
+*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. *
+*  See the License for the specific language governing permissions and      *
+*  limitations under the License.                                           *
+*                                                                           *
+****************************************************************************/
+
 /*****************************************************************************
  *   Copyright(C)2009-2019 by VSF Team                                       *
  *                                                                           *
@@ -16,8 +33,12 @@
  ****************************************************************************/
 
 /*============================ INCLUDES ======================================*/
-#include "tpaste.h"
+#include "./vsf_connect.h"
 /*============================ MACROS ========================================*/
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef MFUNC_IN_U8_DEC_VALUE
 #   error Please define the MFUNC_IN_U8_DEC_VALUE as the input value. It must be \
@@ -89,11 +110,11 @@ a compile-time constant value.
 #   if __MFUNC_OUT_DEC_DIGIT_TEMP1 == 0
 #       define MFUNC_OUT_DEC_STR        __MFUNC_OUT_DEC_DIGIT_TEMP0
 #   else
-#       define MFUNC_OUT_DEC_STR        ATPASTE2(   __MFUNC_OUT_DEC_DIGIT_TEMP1,\
+#       define MFUNC_OUT_DEC_STR        CONNECT2(   __MFUNC_OUT_DEC_DIGIT_TEMP1,\
                                                     __MFUNC_OUT_DEC_DIGIT_TEMP0)
 #   endif
 #else
-#   define MFUNC_OUT_DEC_STR            ATPASTE3(   __MFUNC_OUT_DEC_DIGIT_TEMP2,\
+#   define MFUNC_OUT_DEC_STR            CONNECT3(   __MFUNC_OUT_DEC_DIGIT_TEMP2,\
                                                     __MFUNC_OUT_DEC_DIGIT_TEMP1,\
                                                     __MFUNC_OUT_DEC_DIGIT_TEMP0)
 #endif
@@ -107,4 +128,7 @@ a compile-time constant value.
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ PROTOTYPES ====================================*/
-/*============================ IMPLEMENTATION ================================*/
+
+#ifdef __cplusplus
+}
+#endif

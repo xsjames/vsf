@@ -22,37 +22,48 @@
 
 #include "../../vsf_scsi_cfg.h"
 
-#if VSF_USE_SCSI == ENABLED && VSF_USE_MAL_SCSI == ENABLED
+#if VSF_USE_SCSI == ENABLED && VSF_USE_MAL == ENABLED && VSF_SCSI_USE_MAL_SCSI == ENABLED
 
-#if     defined(VSF_MAL_SCSI_IMPLEMENT)
-#   undef VSF_MAL_SCSI_IMPLEMENT
-#   define __PLOOC_CLASS_IMPLEMENT
-#elif   defined(VSF_MAL_SCSI_INHERIT)
-#   undef VSF_MAL_SCSI_INHERIT
-#   define __PLOOC_CLASS_INHERIT
+#include "component/mal/vsf_mal.h"
+
+#if     defined(__VSF_MAL_SCSI_CLASS_IMPLEMENT)
+#   undef __VSF_MAL_SCSI_CLASS_IMPLEMENT
+#   define __PLOOC_CLASS_IMPLEMENT__
 #endif
 
 #include "utilities/ooc_class.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-declare_simple_class(vk_mal_scsi_t)
+dcl_simple_class(vk_mal_scsi_t)
 
 def_simple_class(vk_mal_scsi_t) {
-    implement(vk_virtual_scsi_t)
     public_member(
+        implement(vk_virtual_scsi_t)
         vk_mal_t *mal;
     )
+#if VSF_USE_SIMPLE_STREAM == ENABLED
+    private_member(
+        vk_mal_stream_t mal_stream;
+    )
+#endif
 };
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
-extern const i_virtual_scsi_drv_t VK_MAL_VIRTUAL_SCSI_DRV;
+extern const vk_virtual_scsi_drv_t vk_mal_virtual_scsi_drv;
 
 /*============================ PROTOTYPES ====================================*/
 
+#ifdef __cplusplus
+}
+#endif
 
-#endif      // VSF_USE_SCSI && VSF_USE_MAL_SCSI
+#endif      // VSF_USE_SCSI && VSF_SCSI_USE_MAL_SCSI
 #endif      // __VSF_MAL_SCSI_H__

@@ -22,52 +22,55 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if VSF_USE_USB_DEVICE == ENABLED && VSF_USE_USB_DEVICE_UVC == ENABLED
+#if VSF_USE_USB_DEVICE == ENABLED && VSF_USBD_USE_UVC == ENABLED
 
 #include "../../../common/class/UVC/vsf_usb_UVC.h"
+#include "component/av/vsf_av.h"
 
-#if     defined(VSF_USBD_UVC_IMPLEMENT)
-#   define __PLOOC_CLASS_IMPLEMENT
-#   undef VSF_USBD_UVC_IMPLEMENT
+#if     defined(__VSF_USBD_UVC_CLASS_IMPLEMENT)
+#   undef __VSF_USBD_UVC_CLASS_IMPLEMENT
+#   define __PLOOC_CLASS_IMPLEMENT__
 #endif
 #include "utilities/ooc_class.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*============================ MACROS ========================================*/
 
-#if VSF_USE_AV != ENABLED
-#   error "VSF_USE_AV MUST be enabled to use uvc"
+#if VSF_USE_VIDEO != ENABLED
+#   error "VSF_USE_VIDEO MUST be enabled to use uvc"
 #endif
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-declare_simple_class(vk_usbd_uvc_t)
+dcl_simple_class(vk_usbd_uvc_t)
 
 typedef struct vk_usbd_uvc_control_t vk_usbd_uvc_control_t;
 
-struct vk_usbd_uvc_control_info_t {
+typedef struct vk_usbd_uvc_control_info_t {
     uint8_t selector;
     uint16_t size;
 
-    vsfav_control_value_t min;
-    vsfav_control_value_t max;
-    vsfav_control_value_t def;
+    vk_av_control_value_t min;
+    vk_av_control_value_t max;
+    vk_av_control_value_t def;
 
     void (*on_set)(vk_usbd_uvc_control_t *control);
-};
-typedef struct vk_usbd_uvc_control_info_t vk_usbd_uvc_control_info_t;
+} vk_usbd_uvc_control_info_t;
 
-struct vk_usbd_uvc_control_t {
+typedef struct vk_usbd_uvc_control_t {
     const vk_usbd_uvc_control_info_t *info;
-    vsfav_control_value_t cur;
-};
+    vk_av_control_value_t cur;
+} vk_usbd_uvc_control_t;
 
-struct vk_usbd_uvc_entity_t {
+typedef struct vk_usbd_uvc_entity_t {
     uint8_t id;
     uint8_t control_num;
     vk_usbd_uvc_control_t *control;
-};
-typedef struct vk_usbd_uvc_entity_t vk_usbd_uvc_entity_t;
+} vk_usbd_uvc_entity_t;
 
 def_simple_class(vk_usbd_uvc_t) {
 
@@ -101,5 +104,9 @@ extern const vk_usbd_class_op_t vk_usbd_uvc_stream_class;
 
 extern vsf_err_t vk_usbd_uvc_send_packet(vk_usbd_uvc_t *uvc, uint8_t *buffer, uint_fast32_t size);
 
-#endif      // VSF_USE_USB_DEVICE && VSF_USE_USB_DEVICE_UVC
+#ifdef __cplusplus
+}
+#endif
+
+#endif      // VSF_USE_USB_DEVICE && VSF_USBD_USE_UVC
 #endif      // __VSF_USBD_UVC_H__

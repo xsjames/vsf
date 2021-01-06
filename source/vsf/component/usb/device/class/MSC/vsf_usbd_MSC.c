@@ -19,12 +19,15 @@
 
 #include "component/usb/vsf_usb_cfg.h"
 
-#if VSF_USE_USB_DEVICE == ENABLED && VSF_USE_USB_DEVICE_MSC == ENABLED
+#if VSF_USE_USB_DEVICE == ENABLED && VSF_USBD_USE_MSC == ENABLED
 
-#define VSF_USBD_INHERIT
-#define VSF_USBD_MSC_IMPLEMENT
-// TODO: use dedicated include
-#include "vsf.h"
+#define __VSF_EDA_CLASS_INHERIT__
+#define __VSF_USBD_CLASS_INHERIT__
+#define __VSF_USBD_MSC_CLASS_IMPLEMENT
+
+#include "kernel/vsf_kernel.h"
+#include "../../vsf_usbd.h"
+#include "./vsf_usbd_MSC.h"
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -36,26 +39,26 @@ enum {
 
 /*============================ PROTOTYPES ====================================*/
 
-static vsf_err_t vk_usbd_msc_request_prepare(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs);
-static vsf_err_t vk_usbd_msc_class_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs);
+static vsf_err_t __vk_usbd_msc_request_prepare(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs);
+static vsf_err_t __vk_usbd_msc_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs);
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
-const vk_usbd_class_op_t vk_usbd_msc_class = {
-    .request_prepare = vk_usbd_msc_request_prepare,
-    .init = vk_usbd_msc_class_init,
+const vk_usbd_class_op_t vk_usbd_msc = {
+    .request_prepare = __vk_usbd_msc_request_prepare,
+    .init = __vk_usbd_msc_init,
 };
 
 /*============================ LOCAL VARIABLES ===============================*/
 /*============================ PROTOTYPES ====================================*/
 
-static void vk_usbd_msc_send_csw(void *p);
-static void vk_usbd_msc_on_cbw(void *p);
-static void vk_usbd_msc_on_idle(void *p);
+static void __vk_usbd_msc_send_csw(void *p);
+static void __vk_usbd_msc_on_cbw(void *p);
+static void __vk_usbd_msc_on_idle(void *p);
 
 /*============================ IMPLEMENTATION ================================*/
 
-static void vk_usbd_msc_error(vk_usbd_msc_t *msc, uint_fast8_t error)
+static void __vk_usbd_msc_error(vk_usbd_msc_t *msc, uint_fast8_t error)
 {
     usb_msc_cbw_t *cbw = &msc->ctx.cbw;
     bool is_in = (cbw->bmCBWFlags & USB_DIR_MASK) == USB_DIR_IN;
@@ -65,9 +68,9 @@ static void vk_usbd_msc_error(vk_usbd_msc_t *msc, uint_fast8_t error)
         if (cbw->dCBWDataTransferLength > 0) {
             vk_usbd_trans_t *trans = &msc->ep_stream.use_as__vk_usbd_trans_t;
             trans->ep = msc->ep_in;
-            trans->pchBuffer = NULL;
-            trans->nSize = 0;
-            trans->on_finish = vk_usbd_msc_send_csw;
+            trans->buffer = NULL;
+            trans->size = 0;
+            trans->on_finish = __vk_usbd_msc_send_csw;
             trans->param = msc;
             vk_usbd_ep_send(msc->dev, trans);
             return;
@@ -75,10 +78,10 @@ static void vk_usbd_msc_error(vk_usbd_msc_t *msc, uint_fast8_t error)
     } else {
         vk_usbd_ep_stall(msc->dev, msc->ep_out);
     }
-    vk_usbd_msc_send_csw(msc);
+    __vk_usbd_msc_send_csw(msc);
 }
 
-static void vk_usbd_msc_send_csw(void *p)
+static void __vk_usbd_msc_send_csw(void *p)
 {
     vk_usbd_msc_t *msc = p;
     usb_msc_csw_t *csw = &msc->ctx.csw;
@@ -87,39 +90,39 @@ static void vk_usbd_msc_send_csw(void *p)
     // TODO: fix csw->dCSWDataResidue
     csw->dCSWSignature = cpu_to_le32(USB_MSC_CSW_SIGNATURE);
     trans->ep = msc->ep_in;
-    trans->pchBuffer = (uint8_t *)&msc->ctx.csw;
-    trans->nSize = sizeof(msc->ctx.csw);
-    trans->on_finish = vk_usbd_msc_on_idle;
+    trans->buffer = (uint8_t *)&msc->ctx.csw;
+    trans->size = sizeof(msc->ctx.csw);
+    trans->on_finish = __vk_usbd_msc_on_idle;
     trans->param = msc;
     vk_usbd_ep_send(msc->dev, trans);
 }
 
-static void vk_usbd_msc_on_data_out(void *p)
+static void __vk_usbd_msc_on_data_out(void *p)
 {
     vsf_eda_post_evt(&((vk_usbd_msc_t *)p)->eda, VSF_EVT_EXECUTE);
 }
 
-static void vk_usbd_msc_on_data_in(void *p)
+static void __vk_usbd_msc_on_data_in(void *p)
 {
     vk_usbd_msc_t *msc = p;
     msc->ctx.csw.dCSWStatus = USB_MSC_CSW_OK;
-    vk_usbd_msc_send_csw(msc);
+    __vk_usbd_msc_send_csw(msc);
 }
 
-static void vk_usbd_msc_on_cbw(void *p)
+static void __vk_usbd_msc_on_cbw(void *p)
 {
     vk_usbd_msc_t *msc = p;
     usb_msc_cbw_t *cbw = &msc->ctx.cbw;
     vk_usbd_trans_t *trans = &msc->ep_stream.use_as__vk_usbd_trans_t;
 
-    if (    (trans->nSize > 0)
+    if (    (trans->size > 0)
         ||  (cbw->dCBWSignature != cpu_to_le32(USB_MSC_CBW_SIGNATURE))
         ||  (cbw->bCBWCBLength < 1) || (cbw->bCBWCBLength > 16)) {
-        vk_usbd_msc_error(msc, USB_MSC_CSW_PHASE_ERROR);
+        __vk_usbd_msc_error(msc, USB_MSC_CSW_PHASE_ERROR);
         return;
     }
     if (cbw->bCBWLUN > msc->max_lun) {
-        vk_usbd_msc_error(msc, USB_MSC_CSW_FAIL);
+        __vk_usbd_msc_error(msc, USB_MSC_CSW_FAIL);
         return;
     }
 
@@ -128,7 +131,7 @@ static void vk_usbd_msc_on_cbw(void *p)
         &&  (cbw->dCBWDataTransferLength > 0)) {
 
         trans->ep = msc->ep_out;
-        trans->on_finish = vk_usbd_msc_on_data_out;
+        trans->on_finish = __vk_usbd_msc_on_data_out;
         trans->param = msc;
         vk_usbd_ep_recv(msc->dev, trans);
     } else {
@@ -136,27 +139,31 @@ static void vk_usbd_msc_on_cbw(void *p)
     }
 }
 
-static void vk_usbd_msc_on_idle(void *p)
+static void __vk_usbd_msc_on_idle(void *p)
 {
     vk_usbd_msc_t *msc = p;
     vk_usbd_trans_t *trans = &msc->ep_stream.use_as__vk_usbd_trans_t;
 
     trans->ep = msc->ep_out;
-    trans->pchBuffer = (uint8_t *)&msc->ctx.cbw;
-    trans->nSize = sizeof(msc->ctx.cbw);
-    trans->on_finish = vk_usbd_msc_on_cbw;
+    trans->buffer = (uint8_t *)&msc->ctx.cbw;
+    trans->size = sizeof(msc->ctx.cbw);
+    trans->on_finish = __vk_usbd_msc_on_cbw;
     trans->param = msc;
     vk_usbd_ep_recv(msc->dev, trans);
 }
 
-static void vk_usbd_msc_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_suppress=pe111
+#endif
+
+static void __vk_usbd_msc_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
 {
     vk_usbd_msc_t *msc = container_of(eda, vk_usbd_msc_t, eda);
     usb_msc_cbw_t *cbw = &msc->ctx.cbw;
     bool is_in = (cbw->bmCBWFlags & USB_DIR_MASK) == USB_DIR_IN;
     vk_usbd_trans_t *trans = &msc->ep_stream.use_as__vk_usbd_trans_t;
-    vsf_err_t errcode;
-    uint32_t reply_len;
+    int_fast32_t reply_len;
 
     switch (evt) {
     case VSF_EVT_INIT:
@@ -164,37 +171,37 @@ static void vk_usbd_msc_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
         vk_scsi_init(msc->scsi);
         break;
     case VSF_EVT_RETURN:
-        errcode = vk_scsi_get_errcode(msc->scsi, &reply_len);
+        reply_len = vsf_eda_get_return_value();
         if (!msc->is_inited) {
-            if (errcode) {
+            if (reply_len < 0) {
                 // fail to initialize scsi
                 VSF_USB_ASSERT(false);
                 return;
             }
             msc->is_inited = true;
-            vk_usbd_msc_on_idle(msc);
+            __vk_usbd_msc_on_idle(msc);
         } else {
-            if (errcode) {
-                vk_usbd_msc_error(msc, USB_MSC_CSW_FAIL);
+            if (reply_len < 0) {
+                __vk_usbd_msc_error(msc, USB_MSC_CSW_FAIL);
                 break;
             }
 
             if (is_in && (cbw->dCBWDataTransferLength > 0)) {
                 if (!msc->is_stream) {
-                    trans->nSize = reply_len;
+                    trans->size = reply_len;
                     trans->ep = msc->ep_in;
-                    trans->on_finish = vk_usbd_msc_on_data_in;
+                    trans->on_finish = __vk_usbd_msc_on_data_in;
                     trans->param = msc;
                     vk_usbd_ep_send(msc->dev, trans);
                 }
             } else {
-                vk_usbd_msc_send_csw(msc);
+                __vk_usbd_msc_send_csw(msc);
             }
         }
         break;
     case VSF_EVT_EXECUTE:
         if (cbw->dCBWDataTransferLength > 0) {
-            if (trans->pchBuffer != NULL) {
+            if (trans->buffer != NULL) {
                 msc->is_stream = false;
                 vk_scsi_execute(msc->scsi, cbw->CBWCB, &trans->use_as__vsf_mem_t);
             } else if (msc->stream != NULL) {
@@ -203,7 +210,7 @@ static void vk_usbd_msc_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
                 vsf_stream_init(msc->stream);
                 if (is_in) {
                     msc->ep_stream.ep = msc->ep_in;
-                    msc->ep_stream.callback.on_finish = vk_usbd_msc_on_data_in;
+                    msc->ep_stream.callback.on_finish = __vk_usbd_msc_on_data_in;
                     vk_usbd_ep_send_stream(&msc->ep_stream, cbw->dCBWDataTransferLength);
                 } else {
                     msc->ep_stream.ep = msc->ep_out;
@@ -222,7 +229,12 @@ static void vk_usbd_msc_evthandler(vsf_eda_t *eda, vsf_evt_t evt)
     }
 }
 
-static vsf_err_t vk_usbd_msc_class_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs)
+#if __IS_COMPILER_IAR__
+//! statement is unreachable
+#   pragma diag_warning=pe111
+#endif
+
+static vsf_err_t __vk_usbd_msc_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs)
 {
     vk_usbd_msc_t *msc = ifs->class_param;
 
@@ -232,11 +244,14 @@ static vsf_err_t vk_usbd_msc_class_init(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs)
     msc->ep_stream.zlp = false;
     msc->ep_stream.callback.param = msc;
 
-    vsf_eda_set_evthandler(&msc->eda, vk_usbd_msc_evthandler);
+    msc->eda.fn.evthandler = __vk_usbd_msc_evthandler;
+#if VSF_KERNEL_CFG_EDA_SUPPORT_ON_TERMINATE == ENABLED
+    msc->eda.on_terminate = NULL;
+#endif
     return vsf_eda_init(&msc->eda, VSF_USBD_CFG_EDA_PRIORITY, false);
 }
 
-static vsf_err_t vk_usbd_msc_request_prepare(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs)
+static vsf_err_t __vk_usbd_msc_request_prepare(vk_usbd_dev_t *dev, vk_usbd_ifs_t *ifs)
 {
     vk_usbd_msc_t *msc = ifs->class_param;
     vk_usbd_ctrl_handler_t *ctrl_handler = &dev->ctrl_handler;
@@ -257,9 +272,9 @@ static vsf_err_t vk_usbd_msc_request_prepare(vk_usbd_dev_t *dev, vk_usbd_ifs_t *
     default:
         return VSF_ERR_NOT_SUPPORT;
     }
-    ctrl_handler->trans.pchBuffer = buffer;
-    ctrl_handler->trans.nSize = size;
+    ctrl_handler->trans.buffer = buffer;
+    ctrl_handler->trans.size = size;
     return VSF_ERR_NONE;
 }
 
-#endif      // VSF_USE_USB_DEVICE && VSF_USE_USB_DEVICE_MSC
+#endif      // VSF_USE_USB_DEVICE && VSF_USBD_USE_MSC

@@ -18,10 +18,12 @@
 
 /*============================ INCLUDES ======================================*/
 
-#include <stdarg.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include <string.h>
+#include "../vsf_utilities_cfg.h"
+
+#if VSF_USE_SIMPLE_SPRINTF == ENABLED
+
+#include "../compiler/compiler.h"
+
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
@@ -43,6 +45,10 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap)
         signed long long integer;
         unsigned long long uinteger;
     } arg;
+
+    if (!size) {
+        goto end;
+    }
 
     size--;     // reserve for '\0' terminator
     while (*format != '\0') {
@@ -84,7 +90,7 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap)
 
             next:
                 ch = *format++;
-                flags.is_upper = isupper(ch);
+                flags.is_upper = isupper(ch) ? 1 : 0;
                 switch (ch) {
                 case 'u':
                     integer_wordsize = 1;
@@ -127,7 +133,8 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap)
                         }
                     } else if (2 == integer_wordsize) {
                         // endian??, not tested
-                        arg.uinteger = va_arg(ap, unsigned int) + ((unsigned long long)va_arg(ap, unsigned int) << 32);
+                        arg.uinteger = va_arg(ap, unsigned int);
+                        arg.uinteger += ((unsigned long long)va_arg(ap, unsigned int) << 32);
                     }
 
                     {
@@ -186,20 +193,27 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap)
                     arg.ch = va_arg(ap, int);
                     if (!size--) { goto end; }
                     *curpos++ = arg.ch;
+                    break;
                 case 's':
                 case 'S':
                     arg.str = va_arg(ap, char *);
+                    if (!arg.str) {
+                        goto end;
+                    }
+
                     actual_width = strlen(arg.str);
-                    width -= actual_width;
+                    if (width < 0) {
+                        width = actual_width;
+                    }
                     if (!flags.align_left) {
-                        while (width-- > 0) {
+                        while (actual_width < width) {
+                            width--;
                             if (!size--) { goto end; }
-                            *curpos++ = flags.has_prefix0 ? '0' : ' ';
+                            *curpos++ = ' ';
                         }
                     }
-                    while (*arg.str != '\0') {
-                        width--;
-                        if (!size--)    { goto end; }
+                    while ((*arg.str != '\0') && (width-- > 0)) {
+                        if (!size--) { goto end; }
                         *curpos++ = *arg.str++;
                     }
                     if (flags.align_left) {
@@ -235,15 +249,21 @@ int snprintf(char *str, size_t size, const char *format, ...)
     return real_size;
 }
 
+int vsprintf(char *str, const char *format, va_list ap)
+{
+    return vsnprintf(str, (size_t)-1, format, ap);
+}
+
 int sprintf(char *str, const char *format, ...)
 {
     int real_size;
     va_list ap;
     va_start(ap, format);
-        real_size = vsnprintf(str, (size_t)-1, format, ap);
+        real_size = vsprintf(str, format, ap);
     va_end(ap);
     return real_size;
 }
 
-/* EOF */
+#endif      // VSF_USE_SIMPLE_SPRINTF
 
+/* EOF */

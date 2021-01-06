@@ -20,12 +20,26 @@
 //#include <rt_sys.h>
 //#endif
 
+#ifdef __USE_COMMON_RETARGET_IO_C__
+#undef __USE_COMMON_RETARGET_IO_C__
+
 #include <stdio.h>
+#include "utilities/vsf_utilities_cfg.h"
+#include "utilities/vsf_utilities.h"
 
 #ifndef UNUSED_PARAM
 # define UNUSED_PARAM(__VAL)    (__VAL) = (__VAL)
 #endif
 
+#if VSF_USE_POSIX == ENABLED
+#include <sys/types.h>
+#include <unistd.h>
+
+void vsf_stdio_init(void)
+{
+    
+}
+#else
 extern int vsf_stdout_putchar(char ch);
 extern int vsf_stderr_putchar(char ch);
 extern int vsf_stdin_getchar(void);
@@ -38,6 +52,7 @@ void vsf_stdio_init(void)
     vsf_stdout_init();
     vsf_stdin_init();
 }
+#endif
 
 /**
   Defined in rt_sys.h, this function writes a character to the console. The
@@ -55,27 +70,56 @@ void vsf_stdio_init(void)
 WEAK(_ttywrch)
 void _ttywrch (int ch) 
 {
+#if VSF_USE_POSIX == ENABLED
+#else
     vsf_stdout_putchar(ch);
+#endif
 }
 
 //SECTION(".vsf.utilities.stdio.arm_compiler._sys_exit")
 WEAK(_sys_exit)
 void _sys_exit(int ch)
 {
+    UNUSED_PARAM(ch);
     while(1);
 }
 
+#if VSF_USE_POSIX != ENABLED
 //SECTION(".vsf.utilities.stdio.arm_compiler.stderr_putchar")
 WEAK(vsf_stderr_putchar)
 int vsf_stderr_putchar(char ch)
 {
     return vsf_stdout_putchar(ch);
 }
+#endif
+
+/* for IAR */
+#if VSF_USE_POSIX == ENABLED
+SECTION(".vsf.utilities.stdio.iar.__open")
+int __open(const char *path_name, int flags, mode_t mode)
+{
+    return open(path_name, flags, mode);
+}
+
+SECTION(".vsf.utilities.stdio.iar.__close")
+void __close(int handle)
+{
+    close(handle);
+}
+
+SECTION(".vsf.utilities.stdio.iar.__lseek")
+off_t __lseek(int handle, off_t offset, int whence)
+{
+    return lseek(handle, offset, whence);
+}
+#endif
 
 SECTION(".vsf.utilities.stdio.iar.__write")
-/* for IAR */
-size_t __write(int handle, const unsigned char *buf, size_t bufSize)
+size_t __write(int handle, const unsigned char *buf, size_t buf_size)
 {
+#if VSF_USE_POSIX == ENABLED
+    return write(handle, (void *)buf, buf_size);
+#else
     size_t nChars = 0;
     /* Check for the command to flush all handles */
     if (handle == -1) {
@@ -86,44 +130,70 @@ size_t __write(int handle, const unsigned char *buf, size_t bufSize)
     if (handle != 1 && handle != 2) {
         return 0;
     }
-    for (/* Empty */; bufSize > 0; --bufSize) {
+    for (/* Empty */; buf_size > 0; --buf_size) {
         vsf_stdout_putchar(*buf++);
         ++nChars;
     }
     return nChars;
+#endif
 }
 
 SECTION(".vsf.utilities.stdio.iar.__read")
-size_t __read(int handle, unsigned char *buf, size_t bufSize)
+size_t __read(int handle, unsigned char *buf, size_t buf_size)
 {
+#if VSF_USE_POSIX == ENABLED
+    return read(handle, buf, buf_size);
+#else
     size_t nChars = 0;
     /* Check for stdin
     (only necessary if FILE descriptors are enabled) */
     if (handle != 0) {
         return 0;
     }
-    for (/*Empty*/; bufSize > 0; --bufSize) {
+    for (/*Empty*/; buf_size > 0; --buf_size) {
         uint8_t c = vsf_stdin_getchar();
         if (c == 0) { break; }
         *buf++ = c;
         ++nChars;
     }
     return nChars;
+#endif
 }
 
 
 
 
 /* for GCC / LLVM */
-SECTION(".vsf.utilities.stdio.gcc._write")
-int _write (int handle, char *buf, int bufSize)
+#if VSF_USE_POSIX == ENABLED
+SECTION(".vsf.utilities.stdio.gcc._open")
+int _open(const char *path_name, int flags, mode_t mode)
 {
-    return __write(handle, (const unsigned char *)buf, bufSize);
+    return open(path_name, flags, mode);
+}
+
+SECTION(".vsf.utilities.stdio.gcc._close")
+void _close(int handle)
+{
+    close(handle);
+}
+
+SECTION(".vsf.utilities.stdio.gcc._lseek")
+off_t _lseek(int handle, off_t offset, int whence)
+{
+    return lseek(handle, offset, whence);
+}
+#endif
+
+SECTION(".vsf.utilities.stdio.gcc._write")
+int _write (int handle, char *buf, int buf_size)
+{
+    return __write(handle, (const unsigned char *)buf, buf_size);
 }
 
 SECTION(".vsf.utilities.stdio.gcc._read")
-int _read (int handle, char *buf, int bufSize)
+int _read (int handle, char *buf, int buf_size)
 {
-    return __read(handle, (unsigned char *)buf, bufSize);
+    return __read(handle, (unsigned char *)buf, buf_size);
 }
 
+#endif

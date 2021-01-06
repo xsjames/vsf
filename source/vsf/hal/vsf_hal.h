@@ -15,20 +15,31 @@
  *                                                                           *
  ****************************************************************************/
 
-#ifndef __VSF_HAL_H__
-#define __VSF_HAL_H__
-
 /*============================ INCLUDES ======================================*/
-#include "hal/vsf_hal_cfg.h"
 
-#include "./arch/vsf_arch.h"
-#include "./driver/driver.h"
+#ifdef __VSF_HEADER_ONLY_SHOW_ARCH_INFO__
 
+#   include "./driver/driver.h"
+#   undef __VSF_HEADER_ONLY_SHOW_ARCH_INFO__
 
-/* \note: never include interface.h here, individual device drivers might 
- *        include it their own driver header files.  
+#else
+
+#   ifndef __VSF_HAL_H__
+#   define __VSF_HAL_H__
+
+#   include "hal/vsf_hal_cfg.h"
+#   include "./arch/vsf_arch.h"
+#   include "./driver/driver.h"
+#   include "./driver/common/common.h"
+
+/* \note: never include interface.h here, individual device drivers might
+ *        include it their own driver header files.
  */
 //#include "./interface.h"
+
+#   ifdef __cplusplus
+extern "C" {
+#   endif
 
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
@@ -41,15 +52,20 @@
  *  \param none
  *  \retval true initialization succeeded.
  *  \retval false initialization failed
- */  
+ */
 extern bool vsf_hal_init(void);
 
 /*! \note initialize level 2 hardware abstract layer
  *  \param none
  *  \retval true initialization succeeded.
  *  \retval false initialization failed
- */  
-extern bool vsf_hal_advance_init(void);
+ */
+extern bool vsf_osa_hal_init(void);
 
-#endif
+#   ifdef __cplusplus
+}
+#   endif
+
+#endif      // __VSF_HAL_H__
+#endif      // __VSF_HEADER_ONLY_SHOW_ARCH_INFO__
 /* EOF */

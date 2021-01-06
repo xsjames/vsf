@@ -25,20 +25,24 @@
 
 #include "../dynarr/vsf_dynarr.h"
 
-#if     defined(VSF_DYNSTACK_IMPLEMENT)
-#   define __PLOOC_CLASS_IMPLEMENT
-#   undef VSF_DYNSTACK_IMPLEMENT
-#elif   defined(VSF_DYNSTACK_INHERIT)
-#   define __PLOOC_CLASS_INHERIT
-#   undef VSF_DYNSTACK_INHERIT
+#if     defined(__VSF_DYNSTACK_CLASS_IMPLEMENT)
+#   define __PLOOC_CLASS_IMPLEMENT__
+#   undef __VSF_DYNSTACK_CLASS_IMPLEMENT
+#elif   defined(__VSF_DYNSTACK_CLASS_INHERIT__)
+#   define __PLOOC_CLASS_INHERIT__
+#   undef __VSF_DYNSTACK_CLASS_INHERIT__
 #endif
 
 #include "utilities/ooc_class.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*============================ MACROS ========================================*/
 /*============================ TYPES =========================================*/
 
-declare_simple_class(vsf_dynstack_t)
+dcl_simple_class(vsf_dynstack_t)
 
 def_simple_class(vsf_dynstack_t) {
     public_member(
@@ -58,6 +62,10 @@ extern void * vsf_dynstack_pop(vsf_dynstack_t *stack, uint_fast16_t num);
 extern vsf_err_t vsf_dynstack_push(vsf_dynstack_t *stack, void *item, uint_fast16_t num);
 extern vsf_err_t vsf_dynstack_push_ext(vsf_dynstack_t *stack, void *ptr, uint_fast32_t len);
 extern vsf_err_t vsf_dynstack_pop_ext(vsf_dynstack_t *stack, void *ptr, uint_fast32_t len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif      // VSF_USE_DYNSTACK
 #endif      // __VSF_DYNSTACK_H__

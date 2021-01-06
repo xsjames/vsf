@@ -19,19 +19,26 @@
 #define __VSF_USB_CDC_H__
 
 /*============================ INCLUDES ======================================*/
+
+#include "utilities/vsf_utilities.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*============================ MACROS ========================================*/
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-enum usb_cdc_req_t {
+typedef enum usb_cdc_req_t {
     USB_CDCREQ_SEND_ENCAPSULATED_COMMAND    = 0x00,
     USB_CDCREQ_GET_ENCAPSULATED_RESPONSE    = 0x01,
     USB_CDCREQ_SET_COMM_FEATURE             = 0x02,
     USB_CDCREQ_GET_COMM_FEATURE             = 0x03,
     USB_CDCREQ_CLEAR_COMM_FEATURE           = 0x04,
-};
-typedef enum usb_cdc_req_t usb_cdc_req_t;
+} usb_cdc_req_t;
 
+typedef struct usb_cdc_union_descriptor_t usb_cdc_union_descriptor_t;
 struct usb_cdc_union_descriptor_t {
     uint8_t bLength;
     uint8_t bDescriptorType;
@@ -40,8 +47,8 @@ struct usb_cdc_union_descriptor_t {
     uint8_t bControlInterface;
     uint8_t bSubordinateInterface[1];
 } PACKED;
-typedef struct usb_cdc_union_descriptor_t usb_cdc_union_descriptor_t;
 
+typedef struct usb_cdc_ecm_descriptor_t usb_cdc_ecm_descriptor_t;
 struct usb_cdc_ecm_descriptor_t {
     uint8_t bLength;
     uint8_t bDescriptorType;
@@ -53,9 +60,12 @@ struct usb_cdc_ecm_descriptor_t {
     uint16_t wNumberMCFilters;
     uint8_t bNumberPowerFilters;
 } PACKED;
-typedef struct usb_cdc_ecm_descriptor_t usb_cdc_ecm_descriptor_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ PROTOTYPES ====================================*/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif    // __VSF_USB_CDC_H__

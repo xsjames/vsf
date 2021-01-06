@@ -19,13 +19,16 @@
 
 #include "../../vsf_mal_cfg.h"
 
-#if VSF_USE_MAL == ENABLED && VSF_USE_FAKEFAT32_MAL == ENABLED
+#if VSF_USE_MAL == ENABLED && VSF_MAL_USE_FAKEFAT32_MAL == ENABLED
 
-#define VSF_MAL_INHERIT
-#define VSF_FAKEFAT32_MAL_IMPLEMENT
-#define VSF_FS_INHERIT
-// TODO: use dedicated include
-#include "vsf.h"
+#define __VSF_MAL_CLASS_INHERIT__
+#define __VSF_FS_CLASS_INHERIT__
+#define __VSF_FAKEFAT32_MAL_CLASS_IMPLEMENT
+
+// for ctype.h
+#include "utilities/vsf_utilities.h"
+#include "../../vsf_mal.h"
+#include "./vsf_fakefat32_mal.h"
 
 /*============================ MACROS ========================================*/
 
@@ -44,12 +47,12 @@
 #define FAT32_FAT_START                     0x0FFFFFF8
 #define FAT32_FAT_INVALID                   0xFFFFFFFF
 
-#define FAKEFAT32_RES_SECTORS               get_unaligned_le16(&fakefat32_mbr[0x0E])
-#define FAKEFAT32_FAT_NUM                   fakefat32_mbr[0x10]
-#define FAKEFAT32_HIDDEN_SECTORS            get_unaligned_le32(&fakefat32_mbr[0x1C])
-#define FAKEFAT32_ROOT_CLUSTER              get_unaligned_le32(&fakefat32_mbr[0x2C])
-#define FAKEFAT32_FSINFO_SECTOR             fakefat32_mbr[0x30]
-#define FAKEFAT32_BACKUP_SECTOR             get_unaligned_le16(&fakefat32_mbr[0x32])
+#define FAKEFAT32_RES_SECTORS               get_unaligned_le16(&__fakefat32_mbr[0x0E])
+#define FAKEFAT32_FAT_NUM                   __fakefat32_mbr[0x10]
+#define FAKEFAT32_HIDDEN_SECTORS            get_unaligned_le32(&__fakefat32_mbr[0x1C])
+#define FAKEFAT32_ROOT_CLUSTER              get_unaligned_le32(&__fakefat32_mbr[0x2C])
+#define FAKEFAT32_FSINFO_SECTOR             __fakefat32_mbr[0x30]
+#define FAKEFAT32_BACKUP_SECTOR             get_unaligned_le16(&__fakefat32_mbr[0x32])
 
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
@@ -57,28 +60,37 @@
 
 static uint_fast32_t __vk_fakefat32_mal_blksz(vk_mal_t *mal, uint_fast64_t addr, uint_fast32_t size, vsf_mal_op_t op);
 static bool __vk_fakefat32_mal_buffer(vk_mal_t *mal, uint_fast64_t addr, uint_fast32_t size, vsf_mal_op_t op, vsf_mem_t *mem);
-static void __vk_fakefat32_mal_init(uintptr_t target, vsf_evt_t evt);
-static void __vk_fakefat32_mal_fini(uintptr_t target, vsf_evt_t evt);
-static void __vk_fakefat32_mal_read(uintptr_t target, vsf_evt_t evt);
-static void __vk_fakefat32_mal_write(uintptr_t target, vsf_evt_t evt);
+dcl_vsf_peda_methods(static, __vk_fakefat32_mal_init)
+dcl_vsf_peda_methods(static, __vk_fakefat32_mal_fini)
+dcl_vsf_peda_methods(static, __vk_fakefat32_mal_read)
+dcl_vsf_peda_methods(static, __vk_fakefat32_mal_write)
 
-static void __vk_fakefat32_dir_read(uintptr_t target, vsf_evt_t evt);
-static void __vk_fakefat32_dir_write(uintptr_t target, vsf_evt_t evt);
+dcl_vsf_peda_methods(static, __vk_fakefat32_dir_read)
+dcl_vsf_peda_methods(static, __vk_fakefat32_dir_write)
 
 /*============================ GLOBAL VARIABLES ==============================*/
 
-const i_mal_drv_t VK_FAKEFAT32_MAL_DRV = {
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
+const vk_mal_drv_t vk_fakefat32_mal_drv = {
     .blksz          = __vk_fakefat32_mal_blksz,
     .buffer         = __vk_fakefat32_mal_buffer,
-    .init           = __vk_fakefat32_mal_init,
-    .fini           = __vk_fakefat32_mal_fini,
-    .read           = __vk_fakefat32_mal_read,
-    .write          = __vk_fakefat32_mal_write,
+    .init           = (vsf_peda_evthandler_t)vsf_peda_func(__vk_fakefat32_mal_init),
+    .fini           = (vsf_peda_evthandler_t)vsf_peda_func(__vk_fakefat32_mal_fini),
+    .read           = (vsf_peda_evthandler_t)vsf_peda_func(__vk_fakefat32_mal_read),
+    .write          = (vsf_peda_evthandler_t)vsf_peda_func(__vk_fakefat32_mal_write),
 };
+
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#endif
 
 /*============================ LOCAL VARIABLES ===============================*/
 
-static uint8_t fakefat32_mbr[512] = {
+static uint8_t __fakefat32_mbr[512] = {
 //00   01   02   03   04   05   06   07   08   09   0A   0B   0C   0D   0E   0F
 0xEB,0x58,0x90,0x4D,0x53,0x44,0x4F,0x53,0x35,0x2E,0x30,0x00,0x00,0x00,0x10,0x00,//00
 0x02,0x00,0x00,0x00,0x00,0xF8,0x00,0x00,0x3F,0x00,0xFF,0x00,0x40,0x00,0x00,0x00,//01
@@ -288,7 +300,8 @@ static uint_fast32_t __vk_fakefat32_calc_dir_clusters(
     child_num = file->d.child_num;
     file = (vk_fakefat32_file_t *)file->d.child;
     for (int i = 0; i < child_num; i++, file++) {
-        if ((file->attr != VSF_FAT_FILE_ATTR_VOLUMID) && __vk_fakefat32_file_is_lfn(file)) {
+        if (    (file->attr != (vk_file_attr_t)VSF_FAT_FILE_ATTR_VOLUMID)
+            &&  __vk_fakefat32_file_is_lfn(file)) {
             // one long name can contain 13 unicode max
             size += 0x20 * ((__vk_fakefat32_calc_lfn_len(file) + 12) / 13);
         }
@@ -296,6 +309,11 @@ static uint_fast32_t __vk_fakefat32_calc_dir_clusters(
     }
     return (size + cluster_size - 1) / cluster_size;
 }
+
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
 
 static vsf_err_t __vk_fakefat32_init_recursion(vk_fakefat32_mal_t *pthis, vk_fakefat32_file_t *file, uint32_t *cur_cluster)
 {
@@ -317,9 +335,9 @@ static vsf_err_t __vk_fakefat32_init_recursion(vk_fakefat32_mal_t *pthis, vk_fak
             clusters = __vk_fakefat32_calc_dir_clusters(pthis, file);
             file->size = clusters * cluster_size;
         }
-        file->callback.read = __vk_fakefat32_dir_read;
-        file->callback.write = __vk_fakefat32_dir_write;
-    } else if (file->attr == VSF_FAT_FILE_ATTR_VOLUMID) {
+        file->callback.read = (vsf_peda_evthandler_t)vsf_peda_func(__vk_fakefat32_dir_read);
+        file->callback.write = (vsf_peda_evthandler_t)vsf_peda_func(__vk_fakefat32_dir_write);
+    } else if (file->attr == (vk_file_attr_t)VSF_FAT_FILE_ATTR_VOLUMID) {
         clusters = 0;
     } else {
         clusters = ((uint64_t)file->size + cluster_size - 1) / cluster_size;
@@ -347,23 +365,36 @@ static vsf_err_t __vk_fakefat32_init_recursion(vk_fakefat32_mal_t *pthis, vk_fak
     return VSF_ERR_NONE;
 }
 
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#endif
+
 static vsf_err_t __vk_fakefat32_init(vk_fakefat32_mal_t *pthis)
 {
     if (!pthis->root.fsop) {
         uint32_t cur_cluster = FAKEFAT32_ROOT_CLUSTER;
 
-        pthis->root.attr = VSF_FILE_ATTR_DIRECTORY | VSF_FILE_ATTR_READ | VSF_FILE_ATTR_WRITE;
+        pthis->root.attr = (vk_file_attr_t)(VSF_FILE_ATTR_DIRECTORY | VSF_FILE_ATTR_READ | VSF_FILE_ATTR_WRITE);
         pthis->root.parent = NULL;
         return __vk_fakefat32_init_recursion(pthis, &pthis->root, &cur_cluster);
     }
     return VSF_ERR_NONE;
 }
 
-static void __vk_fakefat32_dir_read(uintptr_t target, vsf_evt_t evt)
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-align"
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wcast-align"
+#endif
+
+vsf_component_peda_ifs_entry(__vk_fakefat32_dir_read, vk_memfs_callback_read)
 {
-    vk_fakefat32_file_t *file = (vk_fakefat32_file_t *)target;
-    uint_fast64_t addr = file->ctx.io.offset;
-    uint8_t *buff = file->ctx.io.buff;
+    vsf_peda_begin();
+    vk_fakefat32_file_t *file = (vk_fakefat32_file_t *)&vsf_this;
+    uint_fast64_t addr = vsf_local.offset;
+    uint8_t *buff = vsf_local.buff;
 
     uint_fast32_t page_size = file->mal->sector_size;
     vk_fakefat32_file_t *file_dir = file;
@@ -372,7 +403,7 @@ static void __vk_fakefat32_dir_read(uintptr_t target, vsf_evt_t evt)
 
     memset(buff, 0, page_size);
     if (!(file->attr & VSF_FILE_ATTR_DIRECTORY)) {
-        vk_fakefat32_return(file, VSF_ERR_FAIL);
+        vsf_eda_return(VSF_ERR_FAIL);
         return;
     }
 
@@ -386,7 +417,8 @@ static void __vk_fakefat32_dir_read(uintptr_t target, vsf_evt_t evt)
         if (addr) {
             uint_fast32_t current_entry_size;
 
-            if ((file->attr != VSF_FAT_FILE_ATTR_VOLUMID) && __vk_fakefat32_file_is_lfn(file)) {
+            if (    (file->attr != (vk_file_attr_t)VSF_FAT_FILE_ATTR_VOLUMID)
+                &&  __vk_fakefat32_file_is_lfn(file)) {
                 uint_fast32_t lfn_len = __vk_fakefat32_calc_lfn_len(file);
                 uint_fast8_t lfn_entry_num = (uint8_t)((lfn_len + 12) / 13);
                 current_entry_size = (1 + lfn_entry_num) * 0x20;
@@ -402,7 +434,7 @@ static void __vk_fakefat32_dir_read(uintptr_t target, vsf_evt_t evt)
             char sfn[11];
             bool is_lfn = false;
 
-            if (VSF_FAT_FILE_ATTR_VOLUMID == file->attr) {
+            if ((vk_file_attr_t)VSF_FAT_FILE_ATTR_VOLUMID == file->attr) {
                 // ONLY file->name is valid for volume_id
                 // volume_id is 11 characters max
                 __vk_strncpy_fill((char *)buff, file->name, ' ', 11);
@@ -522,14 +554,15 @@ static void __vk_fakefat32_dir_read(uintptr_t target, vsf_evt_t evt)
         }
     }
 return_success:
-    vk_fakefat32_return(file_dir, VSF_ERR_NONE);
+    vsf_eda_return(vsf_local.size);
+    vsf_peda_end();
 }
 
-static void __vk_fakefat32_dir_write(uintptr_t target, vsf_evt_t evt)
+vsf_component_peda_ifs_entry(__vk_fakefat32_dir_write, vk_memfs_callback_write)
 {
-    vk_fakefat32_file_t *file = (vk_fakefat32_file_t *)target;
-    uint_fast64_t addr = file->ctx.io.offset;
-    uint8_t *buff = file->ctx.io.buff;
+    vsf_peda_begin();
+    vk_fakefat32_file_t *file = (vk_fakefat32_file_t *)&vsf_this;
+    uint8_t *buff = vsf_local.buff;
     uint_fast16_t child_num;
 
     uint_fast32_t page_size = file->mal->sector_size;
@@ -585,7 +618,8 @@ fakefat32_dir_write_next:
             break;
         }
     }
-    vk_fakefat32_return(file, VSF_ERR_NONE);
+    vsf_eda_return(vsf_local.size);
+    vsf_peda_end();
 }
 
 static vsf_err_t __vk_fakefat32_read(vk_fakefat32_mal_t *pthis, uint_fast64_t addr, uint8_t *buff)
@@ -632,7 +666,7 @@ static vsf_err_t __vk_fakefat32_read(vk_fakefat32_mal_t *pthis, uint_fast64_t ad
         // other data in hidden sectors, all 0
     } else if ((FAKEFAT32_HIDDEN_SECTORS == block_addr) || ((FAKEFAT32_HIDDEN_SECTORS + FAKEFAT32_BACKUP_SECTOR) == block_addr)) {
         // MBR
-        memcpy(buff, fakefat32_mbr, sizeof(fakefat32_mbr));
+        memcpy(buff, __fakefat32_mbr, sizeof(__fakefat32_mbr));
 
         // Sector size in bytes
         put_unaligned_le16(pthis->sector_size, &buff[0x0B]);
@@ -729,16 +763,25 @@ static vsf_err_t __vk_fakefat32_read(vk_fakefat32_mal_t *pthis, uint_fast64_t ad
             if ((file->f.buff != NULL) && !(file->attr & VSF_FILE_ATTR_DIRECTORY)) {
                 memcpy(buff, &file->f.buff[addr_offset], page_size);
             } else if (file->callback.read != NULL) {
-                file->ctx.io.offset = addr_offset;
-                file->ctx.io.buff = buff;
-                file->ctx.io.size = page_size;
-                vsf_eda_call_param_eda(file->callback.read, file);
+                vsf_err_t err;
+                __vsf_component_call_peda_ifs(vk_memfs_callback_read, err, file->callback.read, 0, file,
+                    .offset     = addr_offset,
+                    .size       = page_size,
+                    .buff       = buff,
+                );
+                UNUSED_PARAM(err);
                 return VSF_ERR_NOT_READY;
             }
         }
     }
     return VSF_ERR_NONE;
 }
+
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic pop
+#endif
 
 static vsf_err_t __vk_fakefat32_write(vk_fakefat32_mal_t *pthis, uint_fast64_t addr, uint8_t *buff)
 {
@@ -757,7 +800,7 @@ static vsf_err_t __vk_fakefat32_write(vk_fakefat32_mal_t *pthis, uint_fast64_t a
     if (block_addr < (FAKEFAT32_HIDDEN_SECTORS + FAKEFAT32_RES_SECTORS + FAKEFAT32_FAT_NUM * fat_sectors)) {
         // first sector and first backup copy of boot sector
         if ((FAKEFAT32_HIDDEN_SECTORS == block_addr) || ((FAKEFAT32_HIDDEN_SECTORS + FAKEFAT32_BACKUP_SECTOR) == block_addr)) {
-            memcpy(fakefat32_mbr, buff, sizeof(fakefat32_mbr));
+            memcpy(__fakefat32_mbr, buff, sizeof(__fakefat32_mbr));
         }
         return VSF_ERR_NONE;
     }
@@ -770,10 +813,13 @@ static vsf_err_t __vk_fakefat32_write(vk_fakefat32_mal_t *pthis, uint_fast64_t a
         if ((file->f.buff != NULL) && !(file->attr & VSF_FILE_ATTR_DIRECTORY)) {
             memcpy(&file->f.buff[addr_offset], buff, page_size);
         } else if (file->callback.write != NULL) {
-            file->ctx.io.offset = addr_offset;
-            file->ctx.io.buff = buff;
-            file->ctx.io.size = page_size;
-            vsf_eda_call_param_eda(file->callback.write, file);
+            vsf_err_t err;
+            __vsf_component_call_peda_ifs(vk_memfs_callback_write, err, file->callback.write, 0, file,
+                .offset     = addr_offset,
+                .size       = page_size,
+                .buff       = buff,
+            );
+            UNUSED_PARAM(err);
             return VSF_ERR_NOT_READY;
         }
     }
@@ -788,114 +834,127 @@ static uint_fast32_t __vk_fakefat32_mal_blksz(vk_mal_t *mal, uint_fast64_t addr,
 
 static bool __vk_fakefat32_mal_buffer(vk_mal_t *mal, uint_fast64_t addr, uint_fast32_t size, vsf_mal_op_t op, vsf_mem_t *mem)
 {
-    mem->pchBuffer = NULL;
-    mem->nSize = 0;
+    mem->buffer = NULL;
+    mem->size = 0;
     return false;
 }
 
-static void __vk_fakefat32_mal_init(uintptr_t target, vsf_evt_t evt)
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wcast-align"
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wcast-align"
+#endif
+
+__vsf_component_peda_ifs_entry(__vk_fakefat32_mal_init, vk_mal_init)
 {
-    vk_fakefat32_mal_t *pthis = (vk_fakefat32_mal_t *)target;
+    vsf_peda_begin();
+    vk_fakefat32_mal_t *pthis = (vk_fakefat32_mal_t *)&vsf_this;
 
     VSF_MAL_ASSERT(pthis != NULL);
-    pthis->result.errcode = __vk_fakefat32_init(pthis);
-    pthis->result.size = 0;
-    vsf_eda_return();
+    vsf_eda_return(__vk_fakefat32_init(pthis));
+    vsf_peda_end();
 }
 
-static void __vk_fakefat32_mal_fini(uintptr_t target, vsf_evt_t evt)
+__vsf_component_peda_ifs_entry(__vk_fakefat32_mal_fini, vk_mal_fini)
 {
-    vk_fakefat32_mal_t *pthis = (vk_fakefat32_mal_t *)target;
+    vsf_peda_begin();
+    vk_fakefat32_mal_t *pthis = (vk_fakefat32_mal_t *)&vsf_this;
 
     VSF_MAL_ASSERT(pthis != NULL);
-    pthis->result.errcode = VSF_ERR_NONE;
-    pthis->result.size = 0;
-    vsf_eda_return();
+    vsf_eda_return(VSF_ERR_NONE);
+    vsf_peda_end();
 }
 
-static void __vk_fakefat32_mal_read(uintptr_t target, vsf_evt_t evt)
+__vsf_component_peda_ifs_entry(__vk_fakefat32_mal_read, vk_mal_read)
 {
-    vk_fakefat32_mal_t *pthis = (vk_fakefat32_mal_t *)target;
+    vsf_peda_begin();
+    vk_fakefat32_mal_t *pthis = (vk_fakefat32_mal_t *)&vsf_this;
 
     VSF_MAL_ASSERT(pthis != NULL);
 
     switch (evt) {
-    case VSF_EVT_RETURN:
-        pthis->result.errcode = pthis->err;
-        if (VSF_ERR_NONE == pthis->result.errcode) {
-        read_finish:
-            pthis->args.size -= pthis->sector_size;
-            pthis->args.addr += pthis->sector_size;
-            pthis->args.buff += pthis->sector_size;
-            pthis->result.size += pthis->sector_size;
-        } else {
-        do_return:
-            vsf_eda_return();
-            break;
+    case VSF_EVT_RETURN: {
+            int32_t result = (int32_t)vsf_eda_get_return_value();
+            if (result >= 0) {
+            read_finish:
+                vsf_local.size -= pthis->sector_size;
+                vsf_local.addr += pthis->sector_size;
+                vsf_local.buff += pthis->sector_size;
+                vsf_local.rsize += pthis->sector_size;
+            } else {
+                vsf_eda_return(result);
+                break;
+            }
+            goto next;
         }
-        goto next;
     case VSF_EVT_INIT:
-        pthis->result.size = 0;
+        vsf_local.rsize = 0;
     next:
-        if (pthis->args.size > 0) {
-            pthis->result.errcode = __vk_fakefat32_read(pthis, pthis->args.addr, pthis->args.buff);
-            if (VSF_ERR_NONE == pthis->result.errcode) {
+        if (vsf_local.size > 0) {
+            vsf_err_t err = __vk_fakefat32_read(pthis, vsf_local.addr, vsf_local.buff);
+            if (VSF_ERR_NONE == err) {
                 goto read_finish;
-            } else if (VSF_ERR_NOT_READY == pthis->result.errcode) {
+            } else if (VSF_ERR_NOT_READY == err) {
+                break;
+            } else {
+                vsf_eda_return(err);
                 break;
             }
         }
-        goto do_return;
+        vsf_eda_return(vsf_local.rsize);
+        break;
     }
+    vsf_peda_end();
 }
 
-static void __vk_fakefat32_mal_write(uintptr_t target, vsf_evt_t evt)
+__vsf_component_peda_ifs_entry(__vk_fakefat32_mal_write, vk_mal_write)
 {
-    vk_fakefat32_mal_t *pthis = (vk_fakefat32_mal_t *)target;
+    vsf_peda_begin();
+    vk_fakefat32_mal_t *pthis = (vk_fakefat32_mal_t *)&vsf_this;
 
     VSF_MAL_ASSERT(pthis != NULL);
 
     switch (evt) {
-    case VSF_EVT_RETURN:
-        pthis->result.errcode = pthis->err;
-        if (VSF_ERR_NONE == pthis->result.errcode) {
-        write_finish:
-            pthis->args.size -= pthis->sector_size;
-            pthis->args.addr += pthis->sector_size;
-            pthis->args.buff += pthis->sector_size;
-            pthis->result.size += pthis->sector_size;
-        } else {
-        do_return:
-            vsf_eda_return();
-            break;
+    case VSF_EVT_RETURN: {
+            int32_t result = (int32_t)vsf_eda_get_return_value();
+            if (result >= 0) {
+            write_finish:
+                vsf_local.size -= pthis->sector_size;
+                vsf_local.addr += pthis->sector_size;
+                vsf_local.buff += pthis->sector_size;
+                vsf_local.wsize += pthis->sector_size;
+            } else {
+                vsf_eda_return(result);
+                break;
+            }
+            goto next;
         }
-        goto next;
     case VSF_EVT_INIT:
-        pthis->result.size = 0;
+        vsf_local.wsize = 0;
     next:
-        if (pthis->args.size > 0) {
-            pthis->result.errcode = __vk_fakefat32_write(pthis, pthis->args.addr, pthis->args.buff);
-            if (VSF_ERR_NONE == pthis->result.errcode) {
+        if (vsf_local.size > 0) {
+            vsf_err_t err = __vk_fakefat32_write(pthis, vsf_local.addr, vsf_local.buff);
+            if (VSF_ERR_NONE == err) {
                 goto write_finish;
-            } else if (VSF_ERR_NOT_READY == pthis->result.errcode) {
+            } else if (VSF_ERR_NOT_READY == err) {
+                break;
+            } else {
+                vsf_eda_return(err);
                 break;
             }
         }
-        goto do_return;
+        vsf_eda_return(vsf_local.wsize);
+        break;
     }
+    vsf_peda_end();
 }
 
-void vk_fakefat32_set_result(vk_fakefat32_file_t *file, vsf_err_t err)
-{
-    if (file->mal != NULL) {
-        file->mal->err = err;
-    }
-}
-
-void vk_fakefat32_return(vk_fakefat32_file_t *file, vsf_err_t err)
-{
-    vk_fakefat32_set_result(file, err);
-    vsf_eda_return();
-}
+#if     __IS_COMPILER_GCC__
+#   pragma GCC diagnostic pop
+#elif   __IS_COMPILER_LLVM__
+#   pragma clang diagnostic pop
+#endif
 
 #endif

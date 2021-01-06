@@ -23,11 +23,15 @@
 #include "component/usb/vsf_usb_cfg.h"
 
 #if     (   (VSF_USE_USB_DEVICE == ENABLED)                                     \
-        && (VSF_USE_USB_DEVICE_DCD_MUSB_FDRC == ENABLED))                       \
+        && (VSF_USBD_USE_DCD_MUSB_FDRC == ENABLED))                             \
     ||  (   (VSF_USE_USB_HOST == ENABLED)                                       \
-        && (VSF_USE_USB_HOST_HCD_MUSB_FDRC == ENABLED))
+        && (VSF_USBH_USE_HCD_MUSB_FDRC == ENABLED))
 
-#include "hal/interface/vsf_interface_usb.h"
+#include "hal/vsf_hal.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*============================ MACROS ========================================*/
 
@@ -136,7 +140,7 @@
 /*============================ MACROFIED FUNCTIONS ===========================*/
 /*============================ TYPES =========================================*/
 
-struct vk_musb_fdrc_reg_t {
+typedef struct vk_musb_fdrc_reg_t {
     struct {
         volatile uint8_t FAddr;
         volatile uint8_t Power;
@@ -173,10 +177,10 @@ struct vk_musb_fdrc_reg_t {
             volatile uint8_t RxCSR2;
             volatile uint8_t RxCount1;
             volatile uint8_t RxCount2;
-            volatile uint8_t TxType;        // for host onkly
-            volatile uint8_t TxIntterval;   // for host only
-            volatile uint8_t RxType;        // for host onkly
-            volatile uint8_t RxIntterval;   // for host only
+            volatile uint8_t TxType;        // for host only
+            volatile uint8_t TxInterval;    // for host only
+            volatile uint8_t RxType;        // for host only
+            volatile uint8_t RxInterval;    // for host only
             volatile uint8_t TxFIFO1;
             volatile uint8_t TxFIFO2;
             volatile uint8_t RxFIFO1;
@@ -197,8 +201,7 @@ struct vk_musb_fdrc_reg_t {
         };
         volatile uint32_t FIFO[8];
     };
-};
-typedef struct vk_musb_fdrc_reg_t vk_musb_fdrc_reg_t;
+} vk_musb_fdrc_reg_t;
 
 /*============================ GLOBAL VARIABLES ==============================*/
 /*============================ INCLUDES ======================================*/
@@ -214,6 +217,10 @@ extern void vk_musb_fdrc_interrupt_init(vk_musb_fdrc_reg_t *reg);
 extern uint_fast16_t vk_musb_fdrc_rx_fifo_size(vk_musb_fdrc_reg_t *reg, uint_fast8_t ep);
 extern void vk_musb_fdrc_read_fifo(vk_musb_fdrc_reg_t *reg, uint_fast8_t ep, uint8_t *buffer, uint_fast16_t size);
 extern void vk_musb_fdrc_write_fifo(vk_musb_fdrc_reg_t *reg, uint_fast8_t ep, uint8_t *buffer, uint_fast16_t size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 #endif      // __VSF_MUSB_FDRC_COMMON_H__
